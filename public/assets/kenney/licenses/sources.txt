@@ -1,0 +1,51 @@
+Kenney files used by this game. All four packs are CC0 1.0.
+PNG files are copied unchanged. OGG files were transcoded to MP3 with
+ffmpeg libmp3lame so they match src/game/audio.ts. No other audio was substituted.
+
+UI Pack 2.0 — https://kenney.nl/assets/ui-pack
+  ui/btn-green.png        PNG/Green/Default/button_rectangle_depth_gradient.png
+  ui/btn-yellow.png       PNG/Yellow/Default/button_rectangle_depth_gradient.png
+  ui/btn-red.png          PNG/Red/Default/button_rectangle_depth_gradient.png
+  ui/btn-blue.png         PNG/Blue/Default/button_rectangle_depth_gradient.png
+  ui/btn-grey.png         PNG/Grey/Default/button_rectangle_depth_gradient.png
+  ui/round-green.png      PNG/Green/Default/button_round_depth_flat.png
+  ui/round-yellow.png     PNG/Yellow/Default/button_round_depth_flat.png
+  ui/round-blue.png       PNG/Blue/Default/button_round_depth_flat.png
+  ui/round-grey.png       PNG/Grey/Default/button_round_depth_flat.png
+  ui/round-red.png        PNG/Red/Default/button_round_depth_flat.png
+  ui/star.png             PNG/Yellow/Default/star.png
+  ui/star-grey.png        PNG/Grey/Default/star.png
+  ui/star-outline.png     PNG/Yellow/Default/star_outline.png
+  ui/check.png            PNG/Green/Default/icon_checkmark.png
+  ui/cross.png            PNG/Red/Default/icon_cross.png
+  ui/arrow-left.png       PNG/Grey/Default/arrow_basic_w.png
+  ui/arrow-right.png      PNG/Grey/Default/arrow_basic_e.png
+
+Particle Pack 1.1 — https://kenney.nl/assets/particle-pack
+  particles/circle.png    PNG (Transparent)/circle_01.png
+  particles/star.png      PNG (Transparent)/star_01.png
+  particles/spark.png     PNG (Transparent)/spark_01.png
+  particles/twirl.png     PNG (Transparent)/twirl_01.png
+  particles/magic.png     PNG (Transparent)/magic_01.png
+
+Interface Sounds 1.0 — https://kenney.nl/assets/interface-sounds
+  audio/click.mp3         Audio/click_001.ogg
+  audio/confirm.mp3       Audio/confirmation_001.ogg
+  audio/confirm2.mp3      Audio/confirmation_002.ogg
+  audio/error.mp3         Audio/error_001.ogg
+  audio/open.mp3          Audio/open_001.ogg
+  audio/toggle.mp3        Audio/toggle_001.ogg
+  audio/tick.mp3          Audio/tick_001.ogg
+  audio/drop.mp3          Audio/drop_001.ogg
+
+Impact Sounds 1.0 — https://kenney.nl/assets/impact-sounds
+  audio/plate.mp3         Audio/impactPlate_light_000.ogg
+  audio/plate2.mp3        Audio/impactPlate_medium_001.ogg
+  audio/pop1.mp3          Audio/impactGeneric_light_000.ogg
+  audio/pop2.mp3          Audio/impactGeneric_light_001.ogg
+  audio/pop3.mp3          Audio/impactTin_medium_000.ogg
+  audio/thud.mp3          Audio/impactSoft_heavy_000.ogg
+  audio/glass.mp3         Audio/impactGlass_light_000.ogg
+  audio/bell.mp3          Audio/impactBell_heavy_000.ogg
+  audio/bump.mp3          Audio/impactPunch_medium_000.ogg
+  audio/wood.mp3          Audio/impactWood_medium_000.ogg

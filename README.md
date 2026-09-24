@@ -54,6 +54,12 @@ npm run preview
 - `public/assets/kenney/licenses/`
 - `public/assets/fonts/OFL.txt`
 
+仓库里提交的是这些文件本身：
+
+- `public/assets/kenney/ui/` 与 `public/assets/kenney/particles/` 的 PNG 从 Kenney 压缩包原样复制。
+- `public/assets/kenney/audio/` 的 MP3 来自同一批 CC0 音效。Kenney 原包是 OGG，这里用 ffmpeg（libmp3lame）转成 MP3，以便按 `src/game/audio.ts` 的路径加载。没有换成其他录音。对应关系在 `public/assets/kenney/licenses/sources.txt`。
+- `public/assets/fonts/NotoSansSC-Bold.woff2` 是 Noto Sans CJK SC Bold 的画面用字子集，不是完整 CJK 字体。
+
 如果这些静态文件没有被检出，开局会改用程序绘制的按钮、星星和粒子，吞咽和失败仍然有合成音效。中文会回退到系统黑体。
 
 CC0 不强制署名。游戏内「致谢」页和这里仍然写出来源。没有使用第三方角色、商店截图或来源不清的素材站。

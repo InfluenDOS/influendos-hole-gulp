@@ -1,3 +1,13 @@
+Noto Sans CJK SC Bold subset for this game.
+Copyright 2014-2021 Adobe (http://www.adobe.com/).
+
+Subset of Noto Sans CJK SC Bold, version 2.004 (Simplified Chinese),
+generated with fontTools pyftsubset. The full CJK font is not included.
+Designers: Ryoko NISHIZUKA (kana, bopomofo & ideographs); Paul D. Hunt
+(Latin, Greek & Cyrillic); Sandoll Communications, Soo-young JANG &
+Joo-yeon KANG (hangul elements, letters & syllables).
+Project architect: Dr. Ken Lunde. Production: Masataka HATTORI.
+
 This Font Software is licensed under the SIL Open Font License,
 Version 1.1.
 
