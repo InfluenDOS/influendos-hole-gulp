@@ -31,9 +31,13 @@ export const DRAG_GAIN_MOUSE = 1
 export const DRAG_SPEED_TOUCH = 720
 export const DRAG_SPEED_MOUSE = 1280
 
-/** How quickly the hole catches its drag target (higher = tighter follow). */
-export const DRAG_RESPONSE_TOUCH = 22
-export const DRAG_RESPONSE_MOUSE = 34
+/**
+ * How quickly the hole catches its drag target (higher = tighter follow).
+ * Gain and max speed still limit a flick. Response only removes the float
+ * on a slow, deliberate drag.
+ */
+export const DRAG_RESPONSE_TOUCH = 64
+export const DRAG_RESPONSE_MOUSE = 84
 
 export function growAmount(tier: Tier): number {
   return 5 + tier * 3.5

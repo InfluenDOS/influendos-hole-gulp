@@ -37,11 +37,12 @@ export class Stage {
 
   constructor(frame: HTMLElement) {
     this.reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches
-    this.camera = new THREE.PerspectiveCamera(46, 9 / 16, 0.08, 80)
+    this.camera = new THREE.PerspectiveCamera(46, 9 / 16, 0.08, 90)
     this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false, powerPreference: 'high-performance' })
     this.renderer.setClearColor(0x140e0c, 1)
     this.renderer.outputColorSpace = THREE.SRGBColorSpace
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.75))
+    const shortSide = Math.min(window.screen?.width || 800, window.screen?.height || 800)
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, shortSide <= 900 ? 1.5 : 1.75))
     this.renderer.domElement.id = 'view'
     frame.appendChild(this.renderer.domElement)
     this.scene.background = new THREE.Color(0x140e0c)
@@ -77,6 +78,8 @@ export class Stage {
   setPlaying(playing: boolean) {
     this.playing = playing
     this.menu.visible = !playing
+    this.camera.fov = playing ? 57 : 46
+    this.camera.updateProjectionMatrix()
   }
 
   add(obj: THREE.Object3D) {
@@ -170,16 +173,19 @@ export class Stage {
     this.follow(focus, 8)
   }
 
-  follow(focus: { x: number; z: number; holeWorld: number; tableW: number; tableD: number }, dt: number) {
-    const back = 7.6 + focus.holeWorld * 0.55
-    const height = 5.6 + focus.holeWorld * 0.42
-    this.look.x += (focus.x - this.look.x) * (1 - Math.exp(-5 * dt))
-    this.look.z += (focus.z - this.look.z) * (1 - Math.exp(-5 * dt))
-    const shake = this.shakeAmp * Math.sin(this.clock * 40)
-    this.camPos.set(this.look.x + shake, height, this.look.z + back)
-    this.camera.position.lerp(this.camPos, 1 - Math.exp(-6 * dt))
-    this.camera.lookAt(this.look.x, -0.85, this.look.z)
-    this.shakeAmp *= Math.exp(-7 * dt)
+  follow(focus: { x: number; z: number; holeWorld: number; tableW: number; tableD: number; dragging?: boolean }, dt: number) {
+    const back = 7.35 + focus.holeWorld * 0.9
+    const height = 7.55 + focus.holeWorld * 0.72
+    const lookAhead = 1.15
+    const rate = focus.dragging ? 36 : 8
+    const k = 1 - Math.exp(-rate * dt)
+    this.look.x += (focus.x - this.look.x) * k
+    this.look.z += (focus.z - lookAhead - this.look.z) * k
+    const shake = this.shakeAmp * Math.sin(this.clock * 46)
+    this.camPos.set(this.look.x + shake * 0.35, height, this.look.z + back)
+    this.camera.position.lerp(this.camPos, 1 - Math.exp(-(focus.dragging ? 28 : 8) * dt))
+    this.camera.lookAt(this.look.x, -0.5, this.look.z)
+    this.shakeAmp *= Math.exp(-8 * dt)
     this.clock += dt
   }
 

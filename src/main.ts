@@ -354,6 +354,7 @@ canvas.addEventListener('pointerdown', (event) => {
   arena.setDrag({ x: focus.x, z: focus.z }, drag.kind)
   coachOn = false
   shell.clearCoach()
+  shell.fadeHint()
   canvas.setPointerCapture(event.pointerId)
 })
 canvas.addEventListener('pointermove', (event) => {

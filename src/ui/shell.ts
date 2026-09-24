@@ -60,6 +60,7 @@ export class Shell {
   private chipSig = ''
   private floats: HTMLElement | null = null
   private toastTimer = 0
+  private hintTimer = 0
 
   constructor(frame: HTMLElement) {
     this.ui = el('div', 'ui')
@@ -80,6 +81,7 @@ export class Shell {
     this.magnetBtn = null
     this.floats = null
     this.chipSig = ''
+    window.clearTimeout(this.hintTimer)
   }
 
   closeModal() {
@@ -200,8 +202,14 @@ export class Shell {
     hud.append(head, chips, hintEl, this.coach, foot, this.floats, banner)
     window.setTimeout(() => banner.classList.add('hide'), 900)
     window.setTimeout(() => banner.remove(), 1400)
+    window.clearTimeout(this.hintTimer)
+    this.hintTimer = window.setTimeout(() => this.fadeHint(), 2400)
     this.play = hud
     this.ui.append(hud)
+  }
+
+  fadeHint() {
+    this.play?.querySelector('.hint')?.classList.add('hide')
   }
 
   syncPlay(timeText: string, low: boolean, timeLabel: string, magnetLabel: string, chips: ChipState[]) {

@@ -16,7 +16,7 @@ type Bit = {
   b: number
 }
 
-const MAX = 96
+const MAX = 140
 
 export class Bursts {
   private bits: Bit[] = []
@@ -32,7 +32,7 @@ export class Bursts {
     this.geo.setAttribute('position', new THREE.BufferAttribute(this.pos, 3))
     this.geo.setAttribute('color', new THREE.BufferAttribute(this.col, 3))
     const mat = new THREE.PointsMaterial({
-      size: 0.22,
+      size: 0.34,
       vertexColors: true,
       transparent: true,
       depthWrite: false,

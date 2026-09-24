@@ -6,6 +6,12 @@ import { holeStart, itemXY, tableXY } from './theme'
 
 const FILLERS: Kind[] = ['berry', 'coin', 'candy', 'star', 'cookie', 'orange', 'grape', 'gem', 'ice', 'apple']
 
+function fillerKinds(level: LevelDef): Kind[] {
+  const banned = new Set(level.items.filter((item) => item.role === 'target').map((item) => item.k))
+  const pool = FILLERS.filter((kind) => !banned.has(kind))
+  return pool.length >= 3 ? pool : FILLERS
+}
+
 export type ScatterSpec = {
   kind: Kind
   x: number
@@ -70,42 +76,47 @@ export function scatterFillers(level: LevelDef): ScatterSpec[] {
   const spawn = pxToWorld(spawnPx.x, spawnPx.y, rows)
   circles.push({ x: spawn.x, z: spawn.z, r: pxRadius(level.startR, rows) * 0.62 })
 
-  const target = 128 + Math.min(48, level.id * 2)
+  const target = 108 + Math.min(36, level.id * 2)
+  const kinds = fillerKinds(level)
   const out: ScatterSpec[] = []
   const place = (x: number, z: number) => {
     if (out.length >= target) return
-    const rPx = TIER_RADIUS[1] * (0.55 + rng() * 0.38)
+    const rPx = TIER_RADIUS[1] * (0.52 + rng() * 0.36)
     const wr = pxRadius(rPx, rows)
     if (x < tw.minX + wr + margin || x > tw.maxX - wr - margin) return
     if (z < tw.minZ + wr + margin || z > tw.maxZ - wr - margin) return
-    if (hits(x, z, wr + 0.015, circles, boxes)) return
-    circles.push({ x, z, r: wr + 0.02 })
-    out.push({ kind: FILLERS[Math.floor(rng() * FILLERS.length)], x, z, rPx })
+    if (hits(x, z, wr + 0.01, circles, boxes)) return
+    circles.push({ x, z, r: wr + 0.012 })
+    out.push({ kind: kinds[Math.floor(rng() * kinds.length)], x, z, rPx })
   }
 
-  const clusters = 9 + Math.floor(level.id / 3)
+  const clusters = 11 + Math.floor(level.id / 4)
   for (let c = 0; c < clusters; c++) {
     let cx = 0
     let cz = 0
     let ok = false
     for (let attempt = 0; attempt < 28; attempt++) {
-      cx = tw.minX + margin + rng() * (tw.w - margin * 2)
-      cz = tw.minZ + margin + rng() * (tw.d - margin * 2)
-      if (!hits(cx, cz, 0.42, circles, boxes)) {
+      const band = rng() < 0.7
+      cx = band ? tw.minX + tw.w * (0.14 + rng() * 0.72) : tw.minX + margin + rng() * (tw.w - margin * 2)
+      cz = band ? tw.minZ + tw.d * (0.16 + rng() * 0.68) : tw.minZ + margin + rng() * (tw.d - margin * 2)
+      if (!hits(cx, cz, 0.36, circles, boxes)) {
         ok = true
         break
       }
     }
     if (!ok) continue
-    const pile = 8 + Math.floor(rng() * 6)
+    const pile = 7 + Math.floor(rng() * 5)
     for (let i = 0; i < pile; i++) {
       const ang = rng() * Math.PI * 2
-      const rad = 0.08 + rng() * 0.78
+      const rad = 0.06 + rng() * 0.62
       place(cx + Math.cos(ang) * rad, cz + Math.sin(ang) * rad)
     }
   }
-  for (let i = 0; i < 80 && out.length < target; i++) {
-    place(tw.minX + rng() * tw.w, tw.minZ + rng() * tw.d)
+  for (let i = 0; i < 260 && out.length < target; i++) {
+    const band = rng() < 0.62
+    const x = band ? tw.minX + tw.w * (0.1 + rng() * 0.8) : tw.minX + rng() * tw.w
+    const z = band ? tw.minZ + tw.d * (0.12 + rng() * 0.76) : tw.minZ + rng() * tw.d
+    place(x, z)
   }
   return out
 }

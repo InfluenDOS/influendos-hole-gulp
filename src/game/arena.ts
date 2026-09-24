@@ -41,6 +41,9 @@ type Actor = {
   falling: boolean
   gone: boolean
   bumpT: number
+  rest: number
+  rewarded: boolean
+  mark: THREE.Mesh | null
 }
 
 export type ChipState = { kind: Kind; name: string; have: number; need: number }
@@ -94,9 +97,14 @@ export class Arena {
   private solids: ({ kind: 'circle'; x: number; z: number; r: number } | { kind: 'rect'; x: number; z: number; hw: number; hd: number })[] = []
   private culprit: Actor | null = null
   private dummy = new THREE.Object3D()
+  private markMat: { target: THREE.Material; bomb: THREE.Material; decoy: THREE.Material } | null = null
   private reduce: boolean
   private acc = 0
   private ended = false
+  private sealing = false
+  private sealT = 0
+  private waiting: Actor[] = []
+  private markGeo: THREE.RingGeometry | null = null
   private ownedGeo: THREE.BufferGeometry[] = []
   private ownedMat: THREE.Material[] = []
   onFail: ((reason: FailReason) => void) | null = null
@@ -121,7 +129,7 @@ export class Arena {
     this.world.defaultContactMaterial.friction = 0.32
     this.world.defaultContactMaterial.restitution = 0.01
     if (this.world.solver instanceof GSSolver) {
-      this.world.solver.iterations = 5
+      this.world.solver.iterations = 4
       this.world.solver.tolerance = 0.01
     }
 
@@ -139,6 +147,24 @@ export class Arena {
     this.hole.setSkin(loadSave().skin)
     this.root.add(this.hole.group)
     this.bursts = new Bursts(this.root)
+    this.markGeo = new THREE.RingGeometry(0.72, 1, 24)
+    this.ownedGeo.push(this.markGeo)
+    const mark = (color: number, opacity: number) => {
+      const material = new THREE.MeshBasicMaterial({
+        color,
+        transparent: true,
+        opacity,
+        side: THREE.DoubleSide,
+        depthWrite: false,
+      })
+      this.ownedMat.push(material)
+      return material
+    }
+    this.markMat = {
+      target: mark(0xffe08a, 0.92),
+      bomb: mark(0xff3b30, 0.96),
+      decoy: mark(0xff8a3d, 0.9),
+    }
     this.spawnActors()
     this.syncHole()
   }
@@ -221,7 +247,7 @@ export class Arena {
       need.set(item.k, (need.get(item.k) ?? 0) + 1)
     }
     for (const actor of this.actors) {
-      if (actor.role === 'target' && actor.gone) have.set(actor.kind, (have.get(actor.kind) ?? 0) + 1)
+      if (actor.role === 'target' && (actor.gone || actor.rewarded)) have.set(actor.kind, (have.get(actor.kind) ?? 0) + 1)
     }
     return kinds.map((kind) => ({
       kind,
@@ -232,20 +258,21 @@ export class Arena {
   }
 
   targetsLeft(): number {
-    return this.actors.filter((actor) => actor.role === 'target' && !actor.gone).length
+    return this.actors.filter((actor) => actor.role === 'target' && !actor.gone && !actor.rewarded).length
   }
 
   get magnetLeft() {
     return this.magnetT
   }
 
-  focus(): { x: number; z: number; holeWorld: number; tableW: number; tableD: number } {
+  focus(): { x: number; z: number; holeWorld: number; tableW: number; tableD: number; dragging: boolean } {
     return {
       x: this.hx,
       z: this.hz,
       holeWorld: pxRadius(this.holeR, this.rows) * this.punch,
       tableW: this.tw.w,
       tableD: this.tw.d,
+      dragging: this.dragging,
     }
   }
 
@@ -259,7 +286,8 @@ export class Arena {
       this.invuln = Math.max(0, this.invuln - clamped)
       if (this.timeLeft <= 0) {
         this.timeLeft = 0
-        this.fail('time', null)
+        if (this.targetsLeft() === 0) this.timeLeft = 0.05
+        else this.fail('time', null)
       } else {
         this.acc += clamped
         let steps = 0
@@ -273,6 +301,15 @@ export class Arena {
         }
         if (steps === 3) this.acc = 0
         this.finishFalls()
+        if (this.sealing) {
+          this.sealT += clamped
+          if (this.sealT > 1.1) {
+            for (const actor of this.actors) {
+              if (actor.role === 'target' && actor.falling && !actor.gone) this.finishActor(actor)
+            }
+          }
+        }
+        this.feedSnacks()
       }
       const sec = Math.ceil(this.timeLeft)
       if (sec <= 8 && sec !== this.lastTick && this.mode === 'play') {
@@ -366,14 +403,18 @@ export class Arena {
     for (const actor of this.actors) {
       if (actor.gone || this.mode !== 'play') continue
       const body = actor.body
+      if (actor.rest > 0) {
+        actor.rest = Math.max(0, actor.rest - dt)
+        continue
+      }
       if (actor.falling) {
         const dx = this.hx - body.position.x
         const dz = this.hz - body.position.z
-        body.velocity.x += dx * 3.2 * dt
-        body.velocity.z += dz * 3.2 * dt
-        body.velocity.y -= 4 * dt
-        body.angularVelocity.x += actor.spin * 6 * dt
-        body.angularVelocity.z += actor.spin * 4 * dt
+        body.velocity.x += dx * 4.5 * dt
+        body.velocity.z += dz * 4.5 * dt
+        body.velocity.y -= 10 * dt
+        body.angularVelocity.x += actor.spin * 8 * dt
+        body.angularVelocity.z += actor.spin * 6 * dt
         continue
       }
       const dx = body.position.x - this.hx
@@ -382,11 +423,11 @@ export class Arena {
       const distPx = dist / this.tw.s
       const food = actor.role === 'snack' || actor.role === 'target' || actor.role === 'filler'
       const edible = canEat(actor.rPx, this.holeR)
-      if (this.invuln <= 0 && actor.role === 'bomb' && distPx < this.holeR * BOMB_RATIO) {
+      if (!this.sealing && this.invuln <= 0 && actor.role === 'bomb' && distPx < this.holeR * BOMB_RATIO) {
         this.fail('bomb', actor)
         return
       }
-      if (this.invuln <= 0 && actor.role === 'decoy' && edible && distPx < this.holeR * GULP_RATIO) {
+      if (!this.sealing && this.invuln <= 0 && actor.role === 'decoy' && edible && distPx < this.holeR * GULP_RATIO) {
         this.fail('decoy', actor)
         return
       }
@@ -437,11 +478,15 @@ export class Arena {
         body.wakeUp()
         const ix = -dx / dist
         const iz = -dz / dist
+        const tx = -dz / dist
+        const tz = dx / dist
         const blend = 1 - Math.exp(-7 * dt)
-        body.velocity.x += (ix * pull - body.velocity.x) * blend
-        body.velocity.z += (iz * pull - body.velocity.z) * blend
-        body.angularVelocity.x += actor.spin * 2.4 * dt
-        body.angularVelocity.y += actor.spin * 1.6 * dt
+        const swirl = pull * 0.62
+        body.velocity.x += (ix * pull + tx * swirl - body.velocity.x) * blend
+        body.velocity.z += (iz * pull + tz * swirl - body.velocity.z) * blend
+        body.angularVelocity.x += actor.spin * 5.2 * dt
+        body.angularVelocity.y += actor.spin * 3.4 * dt
+        body.angularVelocity.z += actor.spin * 2.4 * dt
         body.position.y = Math.max(actor.worldR * 0.85, body.position.y)
       } else if (distPx > (this.magnetT > 0 ? this.holeR * 2.6 : this.holeR * 1.55) && body.velocity.lengthSquared() < 0.12) {
         body.position.x += (actor.homeX - body.position.x) * Math.min(1, dt * 2.2)
@@ -455,44 +500,153 @@ export class Arena {
   }
 
   private beginFall(actor: Actor) {
+    if (actor.falling || actor.rewarded) return
     actor.falling = true
+    actor.rewarded = true
     const body = actor.body
     body.collisionFilterGroup = G_FALL
     body.collisionFilterMask = G_FALL
     body.wakeUp()
-    body.velocity.y = -1.4
-    body.angularVelocity.set(actor.spin * 6, actor.spin * 3, (actor.phase % 2 ? 1 : -1) * 5)
+    const dx = this.hx - body.position.x
+    const dz = this.hz - body.position.z
+    const dist = Math.hypot(dx, dz) || 0.001
+    body.velocity.x = (-dz / dist) * 2.4 + (dx / dist) * 1.6
+    body.velocity.z = (dx / dist) * 2.4 + (dz / dist) * 1.6
+    body.velocity.y = -2.8
+    body.angularVelocity.set(actor.spin * 9, actor.spin * 5, (actor.phase % 2 ? 1 : -1) * 7)
+    this.rewardGulp(actor)
+    if (actor.role === 'target' && this.targetsLeft() === 0) {
+      this.sealing = true
+      this.sealT = 0
+    }
+  }
+
+  private rewardGulp(actor: Actor) {
+    const grow = actor.role === 'filler' ? Math.min(0.18, this.crumbGrow) : growAmount(actor.tier)
+    if (actor.role === 'filler') this.crumbGrow = Math.max(0, this.crumbGrow - grow)
+    this.holeR = Math.min(this.level.maxR, this.holeR + grow)
+    this.punch = Math.min(1.18, this.punch + (actor.role === 'filler' ? 0.02 : 0.06 + actor.tier * 0.012))
+    const pos = actor.body.position
+    this.bursts.burst(
+      pos.x,
+      0.28,
+      pos.z,
+      KIND_COLOR[actor.kind],
+      actor.role === 'filler' ? 8 : 14 + actor.tier * 2,
+      actor.role === 'filler' ? 2 : 2.8,
+    )
+    if (this.clock - this.gulpSound > 0.07 || actor.role !== 'filler') {
+      this.gulpSound = this.clock
+      audio.gulp(actor.tier >= 3 && actor.role !== 'filler')
+    }
+    if (actor.role !== 'filler') this.onShake?.(0.07 + actor.tier * 0.016)
+    if (loadSave().settings.vibrate && actor.tier >= 3 && actor.role !== 'filler') navigator.vibrate?.(12)
+    if (this.clock - this.lastGulp < 0.75) this.combo += 1
+    else this.combo = 1
+    this.lastGulp = this.clock
+    if (actor.role !== 'filler' && (this.combo === 2 || (this.combo >= 5 && this.combo % 5 === 0))) {
+      this.float(this.hx, 0.9, this.hz, `连吞 x${this.combo}`, '#ffe08a')
+    }
   }
 
   private finishFalls() {
     for (const actor of this.actors) {
       if (!actor.falling || actor.gone) continue
-      if (actor.body.position.y < -3.1) this.consume(actor)
+      if (actor.body.position.y < -1.55) this.finishActor(actor)
     }
   }
 
-  private consume(actor: Actor) {
-    if (actor.gone || this.mode !== 'play') return
+  private finishActor(actor: Actor) {
+    if (this.mode !== 'play' || actor.gone) return
+    if (actor.role === 'filler') {
+      this.parkFiller(actor)
+      return
+    }
     this.removeActor(actor)
-    const grow = actor.role === 'filler' ? Math.min(0.18, this.crumbGrow) : growAmount(actor.tier)
-    if (actor.role === 'filler') this.crumbGrow = Math.max(0, this.crumbGrow - grow)
-    this.holeR = Math.min(this.level.maxR, this.holeR + grow)
-    this.punch = Math.min(1.16, this.punch + (actor.role === 'filler' ? 0.012 : 0.045 + actor.tier * 0.01))
-    const pos = actor.body.position
-    this.bursts.burst(pos.x, 0.15, pos.z, KIND_COLOR[actor.kind], actor.role === 'filler' ? 5 : 8 + actor.tier * 2, actor.role === 'filler' ? 1.4 : 2.2)
-    if (this.clock - this.gulpSound > 0.07 || actor.role !== 'filler') {
-      this.gulpSound = this.clock
-      audio.gulp(actor.tier >= 3 && actor.role !== 'filler')
-    }
-    if (actor.role !== 'filler') this.onShake?.(0.04 + actor.tier * 0.012)
-    if (loadSave().settings.vibrate && actor.tier >= 3 && actor.role !== 'filler') navigator.vibrate?.(12)
-    if (this.clock - this.lastGulp < 0.75) this.combo += 1
-    else this.combo = 1
-    this.lastGulp = this.clock
-    if (this.combo === 2 || (this.combo >= 5 && this.combo % 5 === 0)) {
-      this.float(this.hx, 0.9, this.hz, `连吞 x${this.combo}`, '#ffe08a')
-    }
     if (actor.role === 'target' && this.targetsLeft() === 0) this.win()
+  }
+
+  private parkFiller(actor: Actor) {
+    actor.falling = false
+    actor.gone = true
+    actor.body.velocity.set(0, 0, 0)
+    actor.body.angularVelocity.set(0, 0, 0)
+    actor.body.position.set(actor.homeX, -8, actor.homeZ)
+    actor.body.collisionFilterMask = 0
+    actor.body.sleep()
+    this.waiting.push(actor)
+  }
+
+  private feedSnacks() {
+    if (!this.waiting.length || this.mode !== 'play') return
+    const still: Actor[] = []
+    let placed = 0
+    for (const actor of this.waiting) {
+      if (placed >= 2) {
+        still.push(actor)
+        continue
+      }
+      const spot = this.pickSnackSpot(actor.worldR)
+      if (!spot) {
+        still.push(actor)
+        continue
+      }
+      this.dropSnack(actor, spot.x, spot.z)
+      placed += 1
+    }
+    this.waiting = still
+  }
+
+  private dropSnack(actor: Actor, x: number, z: number) {
+    actor.gone = false
+    actor.falling = false
+    actor.rewarded = false
+    actor.rest = 0.4
+    actor.homeX = x
+    actor.homeZ = z
+    const body = actor.body
+    body.position.set(x, actor.worldR, z)
+    body.velocity.set(0, 0, 0)
+    body.angularVelocity.set(0, 0, 0)
+    body.quaternion.setFromEuler((Math.random() - 0.5) * 0.4, Math.random() * Math.PI * 2, (Math.random() - 0.5) * 0.4)
+    body.collisionFilterGroup = G_ITEM
+    body.collisionFilterMask = G_GROUND | G_WALL | G_ITEM
+    body.wakeUp()
+  }
+
+  private pickSnackSpot(radius: number): { x: number; z: number } | null {
+    const holeW = pxRadius(this.holeR, this.rows)
+    for (let attempt = 0; attempt < 16; attempt++) {
+      const ahead = attempt < 11
+      const ang = ahead ? -Math.PI / 2 + (Math.random() - 0.5) * 1.8 : Math.random() * Math.PI * 2
+      const dist = holeW * 2.15 + Math.random() * (ahead ? 4.4 : 6.2)
+      const x = this.hx + Math.cos(ang) * dist
+      const z = this.hz + Math.sin(ang) * dist
+      if (x < this.tw.minX + radius + 0.18 || x > this.tw.maxX - radius - 0.18) continue
+      if (z < this.tw.minZ + radius + 0.18 || z > this.tw.maxZ - radius - 0.18) continue
+      if (this.spotBlocked(x, z, radius, holeW)) continue
+      return { x, z }
+    }
+    return null
+  }
+
+  private spotBlocked(x: number, z: number, radius: number, holeW: number): boolean {
+    if (Math.hypot(x - this.hx, z - this.hz) < holeW * 1.9 + radius) return true
+    for (const solid of this.solids) {
+      if (solid.kind === 'circle') {
+        if (Math.hypot(x - solid.x, z - solid.z) < solid.r + radius + 0.14) return true
+      } else {
+        const cx = Math.max(solid.x - solid.hw, Math.min(x, solid.x + solid.hw))
+        const cz = Math.max(solid.z - solid.hd, Math.min(z, solid.z + solid.hd))
+        if (Math.hypot(x - cx, z - cz) < radius + 0.14) return true
+      }
+    }
+    for (const other of this.actors) {
+      if (other.gone || other.falling) continue
+      const extra = other.role === 'bomb' || other.role === 'decoy' ? 0.55 : other.role === 'target' ? 0.16 : 0.05
+      if (Math.hypot(x - other.body.position.x, z - other.body.position.z) < radius + other.worldR + extra) return true
+    }
+    return false
   }
 
   private removeActor(actor: Actor) {
@@ -536,18 +690,35 @@ export class Arena {
     this.syncHole()
     const touched = new Set<THREE.InstancedMesh>()
     for (const actor of this.actors) {
-      if (actor.gone) continue
+      if (actor.gone) {
+        if (actor.mark) actor.mark.visible = false
+        this.dummy.position.set(0, -20, 0)
+        this.dummy.scale.setScalar(0)
+        this.dummy.updateMatrix()
+        actor.mesh.setMatrixAt(actor.index, this.dummy.matrix)
+        touched.add(actor.mesh)
+        continue
+      }
       const body = actor.body
       const y = actor.falling ? body.position.y : Math.max(actor.worldR * 0.92, body.position.y)
       if (!actor.falling && body.position.y < actor.worldR) body.position.y = actor.worldR
-      const sink = actor.falling && y < 0 ? Math.max(0.35, 1 + y * 0.28) : 1
-      const pulse = actor.role === 'bomb' ? 1 + Math.sin(this.clock * 6 + actor.phase) * 0.06 : 1
+      const sink = actor.falling ? Math.max(0.2, 1 + Math.min(0, y) * 0.46) : 1
+      const pulse = actor.role === 'bomb' ? 1 + Math.sin(this.clock * 8 + actor.phase) * 0.08 : 1
       this.dummy.position.set(body.position.x, y, body.position.z)
       this.dummy.quaternion.set(body.quaternion.x, body.quaternion.y, body.quaternion.z, body.quaternion.w)
       this.dummy.scale.setScalar(actor.worldR * sink * pulse)
       this.dummy.updateMatrix()
       actor.mesh.setMatrixAt(actor.index, this.dummy.matrix)
       touched.add(actor.mesh)
+      if (actor.mark) {
+        const show = !actor.falling
+        actor.mark.visible = show
+        if (show) {
+          const ring = 1 + Math.sin(this.clock * (actor.role === 'bomb' ? 8 : 3.4) + actor.phase) * (actor.role === 'bomb' ? 0.16 : 0.07)
+          actor.mark.position.set(body.position.x, 0.035, body.position.z)
+          actor.mark.scale.setScalar(Math.max(0.34, actor.worldR * 1.9) * ring)
+        }
+      }
     }
     for (const mesh of touched) mesh.instanceMatrix.needsUpdate = true
   }
@@ -610,13 +781,15 @@ export class Arena {
       if (obstacle.kind === 'rect') {
         const hw = pxRadius(obstacle.w / 2, this.rows)
         const hd = pxRadius(obstacle.h / 2, this.rows)
-        const height = 0.62
+        const height = 0.78
+        const plinth = new THREE.Mesh(new THREE.BoxGeometry(hw * 2 * 1.08, 0.08, hd * 2 * 1.35), woodDark)
+        plinth.position.set(w.x, 0.04, w.z)
         const mesh = new THREE.Mesh(new THREE.BoxGeometry(hw * 2, height, hd * 2), wood)
         mesh.position.set(w.x, height / 2, w.z)
         const cap = new THREE.Mesh(new THREE.BoxGeometry(hw * 2 * 0.92, 0.08, hd * 2 * 0.55), woodHi)
         cap.position.set(w.x, height - 0.02, w.z)
-        this.root.add(mesh, cap)
-        this.ownedGeo.push(mesh.geometry, cap.geometry)
+        this.root.add(plinth, mesh, cap)
+        this.ownedGeo.push(plinth.geometry, mesh.geometry, cap.geometry)
         const body = new Body({ mass: 0, collisionFilterGroup: G_WALL, collisionFilterMask: G_ITEM | G_FALL })
         body.addShape(new Box(new Vec3(hw, height / 2 + 0.2, hd)))
         body.position.set(w.x, height / 2, w.z)
@@ -624,12 +797,14 @@ export class Arena {
         this.solids.push({ kind: 'rect', x: w.x, z: w.z, hw, hd })
       } else {
         const r = pxRadius(obstacle.r, this.rows)
-        const mesh = new THREE.Mesh(new THREE.CylinderGeometry(r, r * 0.92, 0.7, 12), woodDark)
-        mesh.position.set(w.x, 0.35, w.z)
-        const top = new THREE.Mesh(new THREE.CylinderGeometry(r * 0.72, r * 0.72, 0.12, 10), wood)
-        top.position.set(w.x, 0.66, w.z)
-        this.root.add(mesh, top)
-        this.ownedGeo.push(mesh.geometry, top.geometry)
+        const base = new THREE.Mesh(new THREE.CylinderGeometry(r * 1.28, r * 1.28, 0.07, 14), wood)
+        base.position.set(w.x, 0.035, w.z)
+        const mesh = new THREE.Mesh(new THREE.CylinderGeometry(r, r * 0.92, 0.78, 12), woodDark)
+        mesh.position.set(w.x, 0.39, w.z)
+        const top = new THREE.Mesh(new THREE.CylinderGeometry(r * 0.72, r * 0.72, 0.12, 10), woodHi)
+        top.position.set(w.x, 0.74, w.z)
+        this.root.add(base, mesh, top)
+        this.ownedGeo.push(base.geometry, mesh.geometry, top.geometry)
         const body = new Body({ mass: 0, collisionFilterGroup: G_WALL, collisionFilterMask: G_ITEM | G_FALL })
         body.addShape(new Sphere(r))
         body.position.set(w.x, r, w.z)
@@ -705,6 +880,20 @@ export class Arena {
           falling: false,
           gone: false,
           bumpT: 0,
+          rest: 0,
+          rewarded: false,
+          mark: null,
+        }
+        if (spec.role === 'target' || spec.role === 'bomb' || spec.role === 'decoy') {
+          const mat = this.markMat?.[spec.role === 'target' ? 'target' : spec.role === 'bomb' ? 'bomb' : 'decoy']
+          if (mat && this.markGeo) {
+            const ring = new THREE.Mesh(this.markGeo, mat)
+            ring.rotation.x = -Math.PI / 2
+            ring.position.set(spec.x, 0.035, spec.z)
+            ring.renderOrder = 2
+            this.root.add(ring)
+            actor.mark = ring
+          }
         }
         this.actors.push(actor)
         this.dummy.position.set(spec.x, worldR, spec.z)

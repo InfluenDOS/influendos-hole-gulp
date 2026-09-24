@@ -20,7 +20,7 @@ function matFor(kind: Kind, emissive = 0x000000): THREE.MeshStandardMaterial {
     roughness: shiny ? 0.28 : 0.46,
     metalness: kind === 'coin' ? 0.55 : kind === 'gem' ? 0.35 : 0.04,
     emissive,
-    emissiveIntensity: emissive ? 0.28 : 0,
+    emissiveIntensity: kind === 'bomb' ? 0.65 : emissive ? 0.28 : 0,
     flatShading: true,
   })
 }
@@ -231,7 +231,7 @@ function build(kind: Kind): THREE.BufferGeometry {
       break
     case 'bomb':
       g = merge([
-        { geo: sphere, matrix: compose(0, -0.05, 0, 1, 1,0, 1), color: base },
+        { geo: sphere, matrix: compose(0, -0.05, 0, 1, 1, 1), color: base },
         { geo: cyl, matrix: compose(0.28, 0.62, 0, 0.08, 0.4, 0.08, 0, 0, -0.5), color: hex(0x6b4a32) },
         { geo: sphere, matrix: compose(0.42, 0.88, 0, 0.18, 0.18, 0.18), color: hex(0xffd24a) },
       ])
@@ -259,7 +259,7 @@ function build(kind: Kind): THREE.BufferGeometry {
 export function propTemplate(kind: Kind): PropTemplate {
   const found = templates.get(kind)
   if (found) return found
-  const emissive = kind === 'gem' ? 0x083848 : kind === 'coin' ? 0x4a3208 : kind === 'bomb' ? 0x1a0808 : 0x000000
+  const emissive = kind === 'gem' ? 0x083848 : kind === 'coin' ? 0x4a3208 : kind === 'bomb' ? 0x5a1418 : 0x000000
   const template = { geo: build(kind), mat: matFor(kind, emissive) }
   templates.set(kind, template)
   return template
