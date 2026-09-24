@@ -43,11 +43,11 @@ class AudioBus {
     await Promise.all(
       Object.entries(FILES).map(async ([name, path]) => {
         try {
-          const res = await fetch(asset(path))
+          const res = await fetch(asset(path), { signal: AbortSignal.timeout(2500) })
           if (!res.ok) return
           this.raw.set(name, await res.arrayBuffer())
         } catch {
-          /* missing file: procedural sounds still play */
+          /* missing file or slow response: procedural sounds still play */
         }
       }),
     )

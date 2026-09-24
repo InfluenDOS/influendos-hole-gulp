@@ -5,11 +5,19 @@ import { loadSave } from '../game/save'
 import { buildTextures } from '../game/textures'
 
 export class BootScene extends Phaser.Scene {
+  private started = false
+  private failSafe = 0
+
   constructor() {
     super('boot')
   }
 
+  init() {
+    this.failSafe = window.setTimeout(() => this.enterTitle(), 4000)
+  }
+
   preload() {
+    this.load.xhr.timeout = 2500
     for (const [key, path] of Object.entries(IMAGE_MANIFEST)) {
       this.load.image(key, asset(path))
     }
@@ -22,16 +30,25 @@ export class BootScene extends Phaser.Scene {
   private async finish() {
     buildTextures(this)
     paintMissingUi(this)
-    await Promise.all([
-      audio.load(),
-      Promise.race([
-        document.fonts.load('bold 48px "Noto Sans SC"'),
-        new Promise((resolve) => window.setTimeout(resolve, 2500)),
+    await Promise.race([
+      Promise.all([
+        audio.load(),
+        document.fonts.load('bold 48px "Noto Sans SC"').catch(() => undefined),
       ]),
+      new Promise((resolve) => window.setTimeout(resolve, 2000)),
     ])
+    this.enterTitle()
+  }
+
+  private enterTitle() {
+    if (this.started) return
+    this.started = true
+    window.clearTimeout(this.failSafe)
+    buildTextures(this)
+    paintMissingUi(this)
     audio.apply(loadSave().settings)
     document.getElementById('boot')?.remove()
-    this.scene.start('title')
+    if (!this.scene.isActive('title')) this.scene.start('title')
   }
 }
 
