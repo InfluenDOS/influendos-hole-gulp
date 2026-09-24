@@ -49,6 +49,36 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
+      # The site must exist before deploy-pages. pages:write on GITHUB_TOKEN can
+      # create it; the cloud agent token cannot change repository Pages settings.
+      - name: Ensure Pages site uses GitHub Actions
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          repo="${{ github.repository }}"
+          branch="${{ github.event.repository.default_branch }}"
+          if [ -z "$branch" ]; then
+            branch=main
+          fi
+          if gh api "repos/${repo}/pages" --silent >/dev/null 2>&1; then
+            build_type="$(gh api "repos/${repo}/pages" --jq .build_type)"
+            if [ "$build_type" = "workflow" ]; then
+              echo "Pages already uses a GitHub Actions workflow."
+            else
+              echo "Switching Pages build type to workflow."
+              gh api --method PUT -H "Accept: application/vnd.github+json" \
+                "repos/${repo}/pages" \
+                -f build_type=workflow
+            fi
+          else
+            echo "Creating the Pages site with build_type=workflow."
+            jq -n --arg branch "$branch" \
+              '{build_type:"workflow",source:{branch:$branch,path:"/"}}' \
+              | gh api --method POST -H "Accept: application/vnd.github+json" \
+                  "repos/${repo}/pages" --input -
+          fi
+
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v5
