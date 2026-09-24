@@ -120,6 +120,34 @@ export class PlayScene extends Phaser.Scene {
     super('play')
   }
 
+  // This Scene object is reused after restart, while shutdown destroys its labels.
+  // Clearing the round here stops the next suck from updating a dead checklist and halting the game loop.
+  init() {
+    this.life += 1
+    this.mode = 'play'
+    this.clock = 0
+    this.hvx = 0
+    this.hvy = 0
+    this.punch = 1
+    this.dragging = false
+    this.keySteering = false
+    this.magnetT = 0
+    this.invuln = 0
+    this.boostersUsed = 0
+    this.revived = false
+    this.combo = 0
+    this.lastGulp = -10
+    this.lastTick = 99
+    this.culprit = null
+    this.failReason = 'time'
+    this.actors = []
+    this.chips = []
+    this.solids = []
+    this.bits = []
+    this.coach = undefined
+    this.modal = null
+  }
+
   create() {
     audio.setBed('play')
     fadeIn(this)
@@ -450,7 +478,7 @@ export class PlayScene extends Phaser.Scene {
     this.lastGulp = this.clock
     if (this.combo >= 2) this.floatText(this.hx, this.hy - this.holeR - 16, `连吞 x${this.combo}`, '#ffe08a')
     if (actor.role === 'target') {
-      const chip = this.chips.find((entry) => entry.k === actor.k)
+      const chip = this.chips.find((entry) => entry.k === actor.k && entry.text.scene)
       if (chip) {
         chip.have += 1
         chip.text.setText(`${KIND_NAME[chip.k]} ${chip.have}/${chip.need}`)
