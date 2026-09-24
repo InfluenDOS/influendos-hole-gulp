@@ -19,6 +19,22 @@ export const BOMB_RATIO = 0.5
 /** Food is gulped once its center is inside this fraction of the hole radius. */
 export const GULP_RATIO = 0.62
 
+/**
+ * How far the hole travels per pixel of finger/cursor travel.
+ * Touch is lower: a light swipe should not cross the table.
+ * Mouse stays 1:1 with the cursor so desktop drag does not feel sluggish.
+ */
+export const DRAG_GAIN_TOUCH = 0.82
+export const DRAG_GAIN_MOUSE = 1
+
+/** Max drag speed in design-table pixels per second (multiplied by world scale). */
+export const DRAG_SPEED_TOUCH = 720
+export const DRAG_SPEED_MOUSE = 1280
+
+/** How quickly the hole catches its drag target (higher = tighter follow). */
+export const DRAG_RESPONSE_TOUCH = 22
+export const DRAG_RESPONSE_MOUSE = 34
+
 export function growAmount(tier: Tier): number {
   return 5 + tier * 3.5
 }

@@ -4,6 +4,7 @@ import { audio } from './audio'
 import { BOMB_RADIUS, BOMB_RATIO, GULP_RATIO, TIER_RADIUS, canEat, growAmount, type Tier } from './balance'
 import { HoleView } from './holeView'
 import { KIND_COLOR, KIND_NAME, type Kind } from './kinds'
+import { followDrag, type DragKind } from './drag'
 import { pxRadius, pxToWorld, tableWorld, type TableWorld } from './layout'
 import { getLevel, levelRows, targetKinds, type LevelDef, type Role } from './levels'
 import { Bursts } from './particles'
@@ -87,7 +88,8 @@ export class Arena {
   private crumbGrow = 16
   private dragging = false
   private keySteer = false
-  private pointer: { x: number; z: number } | null = null
+  private dragKind: DragKind | null = null
+  private dragTarget: { x: number; z: number } | null = null
   private keys = { x: 0, z: 0 }
   private solids: ({ kind: 'circle'; x: number; z: number; r: number } | { kind: 'rect'; x: number; z: number; hw: number; hd: number })[] = []
   private culprit: Actor | null = null
@@ -158,17 +160,20 @@ export class Arena {
     this.root.clear()
   }
 
-  setDragging(on: boolean, point: { x: number; z: number } | null) {
-    if (this.mode !== 'play') {
-      this.dragging = false
+  setDrag(point: { x: number; z: number } | null, kind: DragKind | null) {
+    if (this.mode !== 'play' || !point || !kind) {
+      this.stopDrag()
       return
     }
-    this.dragging = on
-    this.pointer = point
+    this.dragging = true
+    this.dragKind = kind
+    this.dragTarget = point
   }
 
-  setPointer(point: { x: number; z: number } | null) {
-    this.pointer = point
+  private stopDrag() {
+    this.dragging = false
+    this.dragKind = null
+    this.dragTarget = null
   }
 
   setKeys(x: number, z: number) {
@@ -178,7 +183,7 @@ export class Arena {
 
   setMode(mode: PlayMode) {
     this.mode = mode
-    if (mode !== 'play') this.dragging = false
+    if (mode !== 'play') this.stopDrag()
   }
 
   applyTime() {
@@ -294,22 +299,13 @@ export class Arena {
   }
 
   private moveHole(dt: number) {
-    const speed = 1080 * this.tw.s
     this.keySteer = false
-    if (this.dragging && this.pointer) {
-      const tx = THREE.MathUtils.clamp(this.pointer.x, this.tw.minX + 0.25, this.tw.maxX - 0.25)
-      const tz = THREE.MathUtils.clamp(this.pointer.z, this.tw.minZ + 0.25, this.tw.maxZ - 0.25)
-      const dx = tx - this.hx
-      const dz = tz - this.hz
-      const dist = Math.hypot(dx, dz)
-      const step = speed * dt
-      if (dist <= step || dist < 0.0001) {
-        this.hx = tx
-        this.hz = tz
-      } else {
-        this.hx += (dx / dist) * step
-        this.hz += (dz / dist) * step
-      }
+    if (this.dragging && this.dragTarget && this.dragKind) {
+      const tx = THREE.MathUtils.clamp(this.dragTarget.x, this.tw.minX + 0.25, this.tw.maxX - 0.25)
+      const tz = THREE.MathUtils.clamp(this.dragTarget.z, this.tw.minZ + 0.25, this.tw.maxZ - 0.25)
+      const next = followDrag(this.hx, this.hz, tx, tz, dt, this.dragKind, this.tw.s)
+      this.hx = next.x
+      this.hz = next.z
     }
     if (this.keys.x !== 0 || this.keys.z !== 0) {
       this.keySteer = true
@@ -514,7 +510,7 @@ export class Arena {
   private fail(reason: FailReason, culprit: Actor | null) {
     if (this.mode !== 'play') return
     this.mode = 'fail'
-    this.dragging = false
+    this.stopDrag()
     this.failReason = reason
     this.culprit = culprit
     this.onShake?.(0.16)
@@ -526,7 +522,7 @@ export class Arena {
   private win() {
     if (this.mode !== 'play') return
     this.mode = 'win'
-    this.dragging = false
+    this.stopDrag()
     audio.win()
     this.onShake?.(0.08)
     this.onWin?.()

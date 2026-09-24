@@ -1,6 +1,7 @@
 import './style.css'
 import { openRewardedSlot } from './game/ads'
 import { Arena, failCopy } from './game/arena'
+import { dragTarget, type DragKind } from './game/drag'
 import { asset } from './game/assets'
 import { audio } from './game/audio'
 import { warmIcons } from './game/icons'
@@ -302,25 +303,89 @@ document.addEventListener('visibilitychange', () => {
 })
 
 const canvas = stage.renderer.domElement
+
+type DragSession = {
+  pointerId: number
+  kind: DragKind
+  screenX: number
+  screenY: number
+  holeX: number
+  holeZ: number
+  pxPerX: number
+  pxPerZ: number
+}
+
+let drag: DragSession | null = null
+
+function canvasPoint(event: PointerEvent) {
+  const rect = canvas.getBoundingClientRect()
+  return { x: event.clientX - rect.left, y: event.clientY - rect.top }
+}
+
+function dragKindOf(event: PointerEvent): DragKind {
+  return event.pointerType === 'touch' ? 'touch' : 'mouse'
+}
+
+function endDrag() {
+  drag = null
+  arena?.setDrag(null, null)
+}
+
 canvas.addEventListener('pointerdown', (event) => {
-  if (!arena || arena.mode !== 'play' || shell.blocking) return
+  if (!arena || arena.mode !== 'play' || shell.blocking || drag) return
   const point = stage.groundPoint(event.clientX, event.clientY)
   if (!point) return
   const tw = arena.tw
   if (point.x < tw.minX || point.x > tw.maxX || point.z < tw.minZ || point.z > tw.maxZ) return
-  arena.setDragging(true, point)
+  const focus = arena.focus()
+  const scale = stage.groundScale(focus.x, focus.z)
+  if (!scale) return
+  const screen = canvasPoint(event)
+  drag = {
+    pointerId: event.pointerId,
+    kind: dragKindOf(event),
+    screenX: screen.x,
+    screenY: screen.y,
+    holeX: focus.x,
+    holeZ: focus.z,
+    pxPerX: scale.pxPerX,
+    pxPerZ: scale.pxPerZ,
+  }
+  arena.setDrag({ x: focus.x, z: focus.z }, drag.kind)
   coachOn = false
   shell.clearCoach()
   canvas.setPointerCapture(event.pointerId)
 })
 canvas.addEventListener('pointermove', (event) => {
-  if (!arena || !event.buttons) return
-  const point = stage.groundPoint(event.clientX, event.clientY)
-  if (point) arena.setPointer(point)
+  if (!drag || event.pointerId !== drag.pointerId) return
+  if (!arena || arena.mode !== 'play') {
+    endDrag()
+    return
+  }
+  const screen = canvasPoint(event)
+  arena.setDrag(
+    dragTarget(
+      drag.holeX,
+      drag.holeZ,
+      drag.screenX,
+      drag.screenY,
+      screen.x,
+      screen.y,
+      drag.pxPerX,
+      drag.pxPerZ,
+      drag.kind,
+    ),
+    drag.kind,
+  )
 })
-const endDrag = () => arena?.setDragging(false, null)
-canvas.addEventListener('pointerup', endDrag)
-canvas.addEventListener('pointercancel', endDrag)
+canvas.addEventListener('pointerup', (event) => {
+  if (drag && event.pointerId !== drag.pointerId) return
+  endDrag()
+})
+canvas.addEventListener('pointercancel', (event) => {
+  if (drag && event.pointerId !== drag.pointerId) return
+  endDrag()
+})
 
 const boot = async () => {
   warmIcons()
