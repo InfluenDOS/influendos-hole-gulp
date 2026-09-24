@@ -96,6 +96,24 @@ export class Stage {
     return { x: this.hit.x, z: this.hit.z }
   }
 
+  /**
+   * Screen pixels per world unit on the ground at (x, z).
+   * Sampled with the camera that is actually drawing, so a finger move can
+   * be converted where the hole is instead of along a slanted ground ray.
+   */
+  groundScale(x: number, z: number): { pxPerX: number; pxPerZ: number } | null {
+    const eps = 0.5
+    const origin = this.project(x, 0, z)
+    const axisX = this.project(x + eps, 0, z)
+    const axisZ = this.project(x, 0, z + eps)
+    if (!origin || !axisX || !axisZ) return null
+    const pxPerX = (axisX.x - origin.x) / eps
+    const pxPerZ = (axisZ.y - origin.y) / eps
+    if (!Number.isFinite(pxPerX) || !Number.isFinite(pxPerZ)) return null
+    if (Math.abs(pxPerX) < 2 || Math.abs(pxPerZ) < 2) return null
+    return { pxPerX, pxPerZ }
+  }
+
   project(x: number, y: number, z: number): { x: number; y: number } | null {
     this.projected.set(x, y, z).project(this.camera)
     if (this.projected.z > 1) return null
