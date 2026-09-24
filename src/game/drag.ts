@@ -6,8 +6,16 @@ import {
   DRAG_SPEED_MOUSE,
   DRAG_SPEED_TOUCH,
 } from './balance'
+import { clampToTable, type TableWorld } from './layout'
 
 export type DragKind = 'touch' | 'mouse'
+
+export type DragAnchor = {
+  x: number
+  z: number
+  screenX: number
+  screenY: number
+}
 
 /**
  * Map a finger/cursor move onto the table without raycasting.
@@ -33,6 +41,43 @@ export function dragTarget(
   return {
     x: grabHoleX + ((screenX - grabScreenX) / pxPerWorldX) * gain,
     z: grabHoleZ + ((screenY - grabScreenY) / pxPerWorldZ) * gain,
+  }
+}
+
+/**
+ * Turn a pointer move into a table point the hole is allowed to chase.
+ *
+ * The raw point uses the gesture anchor, so camera follow cannot amplify it.
+ * If that point lands past the wood, it is clamped and the anchor is moved
+ * to the contact point. Later motion is measured from the rim, so dragging
+ * back toward the table moves immediately. Leaving the anchor outside would
+ * store the whole overshoot, and a short reverse drag would never re-enter.
+ */
+export function dragTo(
+  anchor: DragAnchor,
+  screenX: number,
+  screenY: number,
+  pxPerWorldX: number,
+  pxPerWorldZ: number,
+  kind: DragKind,
+  table: TableWorld,
+): { point: { x: number; z: number }; anchor: DragAnchor } {
+  const raw = dragTarget(
+    anchor.x,
+    anchor.z,
+    anchor.screenX,
+    anchor.screenY,
+    screenX,
+    screenY,
+    pxPerWorldX,
+    pxPerWorldZ,
+    kind,
+  )
+  const point = clampToTable(raw.x, raw.z, table)
+  const pressedOut = Math.abs(point.x - raw.x) > 1e-4 || Math.abs(point.z - raw.z) > 1e-4
+  return {
+    point,
+    anchor: pressedOut ? { x: point.x, z: point.z, screenX, screenY } : anchor,
   }
 }
 

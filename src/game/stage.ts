@@ -117,6 +117,21 @@ export class Stage {
     return { pxPerX, pxPerZ }
   }
 
+  /**
+   * Pixels per world unit from the vertical field of view.
+   * Used when the hole sits where the ground sample cannot be projected,
+   * so a drag can still start and pull it back.
+   */
+  fallbackGroundScale(): { pxPerX: number; pxPerZ: number } {
+    const w = Math.max(1, this.renderer.domElement.clientWidth)
+    const h = Math.max(1, this.renderer.domElement.clientHeight)
+    const dist = Math.max(0.5, this.camera.position.y)
+    const visibleH = 2 * Math.tan(THREE.MathUtils.degToRad(this.camera.fov) / 2) * dist
+    const pxPerZ = h / Math.max(0.25, visibleH)
+    const pxPerX = w / Math.max(0.25, visibleH * Math.max(0.2, this.camera.aspect))
+    return { pxPerX: Math.max(2, pxPerX), pxPerZ: Math.max(2, pxPerZ) }
+  }
+
   project(x: number, y: number, z: number): { x: number; y: number } | null {
     this.projected.set(x, y, z).project(this.camera)
     if (this.projected.z > 1) return null
