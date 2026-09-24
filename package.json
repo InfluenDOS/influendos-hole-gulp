@@ -1,0 +1,19 @@
+{
+  "name": "influendos-hole-gulp",
+  "version": "1.0.0",
+  "private": true,
+  "description": "黑洞一口吞 — portrait hypercasual hole-gulp game",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "phaser": "^3.88.2"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.3",
+    "vite": "^6.3.5"
+  }
+}
