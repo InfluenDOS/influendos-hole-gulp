@@ -5,7 +5,7 @@ import { BOMB_RADIUS, BOMB_RATIO, GULP_RATIO, TIER_RADIUS, canEat, growAmount, t
 import { HoleView } from './holeView'
 import { KIND_COLOR, KIND_NAME, type Kind } from './kinds'
 import { followDrag, type DragKind } from './drag'
-import { pxRadius, pxToWorld, tableWorld, type TableWorld } from './layout'
+import { clampToTable, pxRadius, pxToWorld, tableWorld, type TableWorld } from './layout'
 import { getLevel, levelRows, targetKinds, type LevelDef, type Role } from './levels'
 import { Bursts } from './particles'
 import { propTemplate } from './props'
@@ -193,7 +193,15 @@ export class Arena {
     }
     this.dragging = true
     this.dragKind = kind
-    this.dragTarget = point
+    this.dragTarget = clampToTable(point.x, point.z, this.tw)
+  }
+
+  /** Pull the center back onto the wood. Safe to call every frame. */
+  clampHole() {
+    const next = clampToTable(this.hx, this.hz, this.tw)
+    this.hx = next.x
+    this.hz = next.z
+    if (this.dragTarget) this.dragTarget = clampToTable(this.dragTarget.x, this.dragTarget.z, this.tw)
   }
 
   private stopDrag() {
@@ -278,6 +286,7 @@ export class Arena {
 
   update(dt: number) {
     if (this.ended) return
+    this.clampHole()
     const clamped = Math.min(0.05, dt)
     this.clock += clamped
     if (this.mode === 'play') {
@@ -318,6 +327,7 @@ export class Arena {
       }
     }
     this.punch += (1 - this.punch) * Math.min(1, clamped * 8)
+    this.clampHole()
     this.syncMeshes()
     this.bursts.update(clamped)
     this.hole.setMagnet(this.magnetT > 0, this.clock)
@@ -338,9 +348,9 @@ export class Arena {
   private moveHole(dt: number) {
     this.keySteer = false
     if (this.dragging && this.dragTarget && this.dragKind) {
-      const tx = THREE.MathUtils.clamp(this.dragTarget.x, this.tw.minX + 0.25, this.tw.maxX - 0.25)
-      const tz = THREE.MathUtils.clamp(this.dragTarget.z, this.tw.minZ + 0.25, this.tw.maxZ - 0.25)
-      const next = followDrag(this.hx, this.hz, tx, tz, dt, this.dragKind, this.tw.s)
+      const target = clampToTable(this.dragTarget.x, this.dragTarget.z, this.tw)
+      this.dragTarget = target
+      const next = followDrag(this.hx, this.hz, target.x, target.z, dt, this.dragKind, this.tw.s)
       this.hx = next.x
       this.hz = next.z
     }
@@ -355,9 +365,7 @@ export class Arena {
     this.hvx *= Math.exp(-8 * dt)
     this.hvz *= Math.exp(-8 * dt)
     this.resolveSolids()
-    const pad = 0.2
-    this.hx = THREE.MathUtils.clamp(this.hx, this.tw.minX + pad, this.tw.maxX - pad)
-    this.hz = THREE.MathUtils.clamp(this.hz, this.tw.minZ + pad, this.tw.maxZ - pad)
+    this.clampHole()
   }
 
   private collisionR() {

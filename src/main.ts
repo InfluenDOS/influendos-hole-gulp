@@ -1,7 +1,7 @@
 import './style.css'
 import { openRewardedSlot } from './game/ads'
 import { Arena, failCopy } from './game/arena'
-import { dragTarget, type DragKind } from './game/drag'
+import { dragTo, type DragAnchor, type DragKind } from './game/drag'
 import { asset } from './game/assets'
 import { audio } from './game/audio'
 import { warmIcons } from './game/icons'
@@ -307,10 +307,7 @@ const canvas = stage.renderer.domElement
 type DragSession = {
   pointerId: number
   kind: DragKind
-  screenX: number
-  screenY: number
-  holeX: number
-  holeZ: number
+  anchor: DragAnchor
   pxPerX: number
   pxPerZ: number
 }
@@ -333,21 +330,17 @@ function endDrag() {
 
 canvas.addEventListener('pointerdown', (event) => {
   if (!arena || arena.mode !== 'play' || shell.blocking || drag) return
-  const point = stage.groundPoint(event.clientX, event.clientY)
-  if (!point) return
-  const tw = arena.tw
-  if (point.x < tw.minX || point.x > tw.maxX || point.z < tw.minZ || point.z > tw.maxZ) return
+  // The mouth hangs off the wood at the rim, and the camera shows the void
+  // beyond it. A press there used to miss the table ray test and never
+  // start a drag, so the hole could not be pulled back. Grab it anyway.
+  arena.clampHole()
   const focus = arena.focus()
-  const scale = stage.groundScale(focus.x, focus.z)
-  if (!scale) return
+  const scale = stage.groundScale(focus.x, focus.z) ?? stage.fallbackGroundScale()
   const screen = canvasPoint(event)
   drag = {
     pointerId: event.pointerId,
     kind: dragKindOf(event),
-    screenX: screen.x,
-    screenY: screen.y,
-    holeX: focus.x,
-    holeZ: focus.z,
+    anchor: { x: focus.x, z: focus.z, screenX: screen.x, screenY: screen.y },
     pxPerX: scale.pxPerX,
     pxPerZ: scale.pxPerZ,
   }
@@ -364,20 +357,9 @@ canvas.addEventListener('pointermove', (event) => {
     return
   }
   const screen = canvasPoint(event)
-  arena.setDrag(
-    dragTarget(
-      drag.holeX,
-      drag.holeZ,
-      drag.screenX,
-      drag.screenY,
-      screen.x,
-      screen.y,
-      drag.pxPerX,
-      drag.pxPerZ,
-      drag.kind,
-    ),
-    drag.kind,
-  )
+  const placed = dragTo(drag.anchor, screen.x, screen.y, drag.pxPerX, drag.pxPerZ, drag.kind, arena.tw)
+  drag.anchor = placed.anchor
+  arena.setDrag(placed.point, drag.kind)
 })
 canvas.addEventListener('pointerup', (event) => {
   if (drag && event.pointerId !== drag.pointerId) return

@@ -45,3 +45,17 @@ export function pxToWorld(px: number, py: number, rows: number): { x: number; z:
 export function pxRadius(px: number, rows: number): number {
   return px * tableWorld(rows).s
 }
+
+/**
+ * Keep the hole center this far inside the wood. Small on purpose: the mouth
+ * has to reach snacks that sit near the rim. The disk may overhang; the
+ * center must not.
+ */
+export const TABLE_INSET = 0.2
+
+export function clampToTable(x: number, z: number, tw: TableWorld, inset = TABLE_INSET): { x: number; z: number } {
+  return {
+    x: Math.min(tw.maxX - inset, Math.max(tw.minX + inset, x)),
+    z: Math.min(tw.maxZ - inset, Math.max(tw.minZ + inset, z)),
+  }
+}
