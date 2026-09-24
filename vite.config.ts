@@ -16,5 +16,6 @@ export default defineConfig({
     outDir: 'dist',
     target: 'es2022',
     assetsInlineLimit: 0,
+    chunkSizeWarningLimit: 800,
   },
 })
