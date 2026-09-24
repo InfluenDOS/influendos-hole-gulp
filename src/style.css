@@ -38,15 +38,6 @@ body,
   font-size: calc(min(100vh, 100vw * 16 / 9) * 0.022);
 }
 
-#frame::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  z-index: 1;
-  pointer-events: none;
-  background: radial-gradient(ellipse at 50% 42%, transparent 48%, rgba(8, 4, 3, 0.42) 100%);
-}
-
 #view {
   position: absolute;
   inset: 0;
@@ -314,7 +305,6 @@ footer .btn {
   padding: 0.35em 0.6em;
   font-weight: 700;
   font-size: 1.15em;
-  box-shadow: 0 0.2em 0.5em rgba(0, 0, 0, 0.28);
 }
 .timer.low { color: #ff4d3a; }
 .chips {

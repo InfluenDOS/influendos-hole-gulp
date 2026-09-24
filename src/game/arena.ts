@@ -7,7 +7,7 @@ import { KIND_COLOR, KIND_NAME, type Kind } from './kinds'
 import { followDrag, type DragKind } from './drag'
 import { clampToTable, pxRadius, pxToWorld, tableWorld, type TableWorld } from './layout'
 import { getLevel, levelRows, targetKinds, type LevelDef, type Role } from './levels'
-import { Bursts, ContactShadows } from './particles'
+import { Bursts } from './particles'
 import { propTemplate } from './props'
 import { loadSave } from './save'
 import { scatterFillers } from './scatter'
@@ -44,7 +44,6 @@ type Actor = {
   rest: number
   rewarded: boolean
   mark: THREE.Mesh | null
-  halo: THREE.Mesh | null
 }
 
 export type ChipState = { kind: Kind; name: string; have: number; need: number }
@@ -102,12 +101,7 @@ export class Arena {
     target: THREE.Material
     bomb: THREE.Material
     decoy: THREE.Material
-    targetGlow: THREE.Material
-    bombGlow: THREE.Material
-    decoyGlow: THREE.Material
   } | null = null
-  private shadows: ContactShadows | null = null
-  private suckT = 0
   private reduce: boolean
   private acc = 0
   private ended = false
@@ -170,25 +164,10 @@ export class Arena {
       this.ownedMat.push(material)
       return material
     }
-    const glow = (color: number, opacity: number) => {
-      const material = new THREE.MeshBasicMaterial({
-        color,
-        transparent: true,
-        opacity,
-        blending: THREE.AdditiveBlending,
-        side: THREE.DoubleSide,
-        depthWrite: false,
-      })
-      this.ownedMat.push(material)
-      return material
-    }
     this.markMat = {
-      target: mark(0xffe08a, 0.95),
-      bomb: mark(0xff3b30, 0.98),
-      decoy: mark(0xff8a3d, 0.92),
-      targetGlow: glow(0xfff3c4, 0.55),
-      bombGlow: glow(0xff5a48, 0.62),
-      decoyGlow: glow(0xffb15a, 0.42),
+      target: mark(0xffe08a, 0.92),
+      bomb: mark(0xff3b30, 0.96),
+      decoy: mark(0xff8a3d, 0.9),
     }
     this.spawnActors()
     this.syncHole()
@@ -201,7 +180,6 @@ export class Arena {
   dispose() {
     this.ended = true
     this.bursts.dispose()
-    this.shadows?.dispose()
     this.hole.dispose()
     this.root.traverse((obj) => {
       if (obj instanceof THREE.InstancedMesh) obj.dispose()
@@ -356,8 +334,6 @@ export class Arena {
     this.clampHole()
     this.syncMeshes()
     this.bursts.update(clamped)
-    this.suckT = Math.max(0, this.suckT - clamped)
-    this.hole.setSuck(this.reduce ? 0 : this.suckT / 0.45)
     this.hole.setMagnet(this.magnetT > 0, this.clock)
     this.hole.setAlpha(this.invuln > 0 && Math.sin(this.clock * 22) > 0 ? 0.35 : 1)
     this.hole.update(this.clock, this.reduce)
@@ -451,9 +427,6 @@ export class Arena {
         body.velocity.y -= 10 * dt
         body.angularVelocity.x += actor.spin * 8 * dt
         body.angularVelocity.z += actor.spin * 6 * dt
-        if (!this.reduce && Math.random() < dt * 7) {
-          this.bursts.sparkle(body.position.x, Math.max(0.06, body.position.y), body.position.z, KIND_COLOR[actor.kind], 1)
-        }
         continue
       }
       const dx = body.position.x - this.hx
@@ -566,18 +539,7 @@ export class Arena {
     this.holeR = Math.min(this.level.maxR, this.holeR + grow)
     this.punch = Math.min(1.18, this.punch + (actor.role === 'filler' ? 0.02 : 0.06 + actor.tier * 0.012))
     const pos = actor.body.position
-    const tint = actor.role === 'target' ? 0xffe08a : KIND_COLOR[actor.kind]
-    this.bursts.burst(pos.x, 0.28, pos.z, tint, actor.role === 'filler' ? 8 : 16 + actor.tier * 2, actor.role === 'filler' ? 2 : 3.1)
-    this.bursts.lip(this.hx, this.hz, pxRadius(this.holeR, this.rows), tint)
-    if (actor.role === 'target') {
-      this.bursts.sparkle(pos.x, 0.45, pos.z, 0xfff6c8, 12)
-      this.suckT = 0.45
-    } else if (actor.role !== 'filler') {
-      this.bursts.sparkle(pos.x, 0.35, pos.z, tint, 4)
-      this.suckT = Math.max(this.suckT, 0.28)
-    } else {
-      this.suckT = Math.max(this.suckT, 0.12)
-    }
+    this.bursts.burst(pos.x, 0.22, pos.z, KIND_COLOR[actor.kind], actor.role === 'filler' ? 3 : 5, 1.35)
     if (this.clock - this.gulpSound > 0.07 || actor.role !== 'filler') {
       this.gulpSound = this.clock
       audio.gulp(actor.tier >= 3 && actor.role !== 'filler')
@@ -732,11 +694,9 @@ export class Arena {
   private syncMeshes() {
     this.syncHole()
     const touched = new Set<THREE.InstancedMesh>()
-    this.actors.forEach((actor, index) => {
+    this.actors.forEach((actor) => {
       if (actor.gone) {
         if (actor.mark) actor.mark.visible = false
-        if (actor.halo) actor.halo.visible = false
-        this.shadows?.place(index, 0, 0, 0)
         this.dummy.position.set(0, -20, 0)
         this.dummy.scale.setScalar(0)
         this.dummy.updateMatrix()
@@ -755,30 +715,21 @@ export class Arena {
       this.dummy.updateMatrix()
       actor.mesh.setMatrixAt(actor.index, this.dummy.matrix)
       touched.add(actor.mesh)
-      const shade = actor.falling ? Math.max(0.15, 1 + Math.min(0, body.position.y) * 0.35) : 1
-      this.shadows?.place(index, body.position.x, body.position.z, actor.worldR * 1.45 * shade)
       if (actor.mark) {
         const show = !actor.falling
         actor.mark.visible = show
-        if (actor.halo) actor.halo.visible = show
         if (show) {
           const ring = 1 + Math.sin(this.clock * (actor.role === 'bomb' ? 8 : 3.4) + actor.phase) * (actor.role === 'bomb' ? 0.16 : 0.07)
           const scale = Math.max(0.34, actor.worldR * 1.9) * ring
           actor.mark.position.set(body.position.x, 0.035, body.position.z)
           actor.mark.scale.setScalar(scale)
-          if (actor.halo) {
-            actor.halo.position.set(body.position.x, 0.03, body.position.z)
-            actor.halo.scale.setScalar(scale * 1.42)
-          }
         }
       }
     })
     for (const mesh of touched) mesh.instanceMatrix.needsUpdate = true
-    this.shadows?.commit()
   }
 
   private buildTable() {
-    this.tableMat.uniforms.uHalf.value.set(this.tw.w * 0.5, this.tw.d * 0.5)
     const top = new THREE.Mesh(new THREE.PlaneGeometry(this.tw.w, this.tw.d), this.tableMat)
     top.rotation.x = -Math.PI / 2
     top.position.y = 0
@@ -938,13 +889,10 @@ export class Arena {
           rest: 0,
           rewarded: false,
           mark: null,
-          halo: null,
         }
         if (spec.role === 'target' || spec.role === 'bomb' || spec.role === 'decoy') {
           const key = spec.role === 'target' ? 'target' : spec.role === 'bomb' ? 'bomb' : 'decoy'
-          const glowKey = spec.role === 'target' ? 'targetGlow' : spec.role === 'bomb' ? 'bombGlow' : 'decoyGlow'
           const mat = this.markMat?.[key]
-          const glowMat = this.markMat?.[glowKey]
           if (mat && this.markGeo) {
             const ring = new THREE.Mesh(this.markGeo, mat)
             ring.rotation.x = -Math.PI / 2
@@ -952,14 +900,6 @@ export class Arena {
             ring.renderOrder = 2
             this.root.add(ring)
             actor.mark = ring
-          }
-          if (glowMat && this.markGeo) {
-            const halo = new THREE.Mesh(this.markGeo, glowMat)
-            halo.rotation.x = -Math.PI / 2
-            halo.position.set(spec.x, 0.03, spec.z)
-            halo.renderOrder = 2
-            this.root.add(halo)
-            actor.halo = halo
           }
         }
         this.actors.push(actor)
@@ -971,6 +911,5 @@ export class Arena {
       })
       mesh.instanceMatrix.needsUpdate = true
     }
-    this.shadows = new ContactShadows(this.root, this.actors.length)
   }
 }
