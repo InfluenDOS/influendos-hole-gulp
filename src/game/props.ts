@@ -20,7 +20,7 @@ function matFor(kind: Kind, emissive = 0x000000): THREE.MeshStandardMaterial {
     roughness: shiny ? 0.28 : 0.46,
     metalness: kind === 'coin' ? 0.55 : kind === 'gem' ? 0.35 : 0.04,
     emissive,
-    emissiveIntensity: kind === 'bomb' ? 0.65 : emissive ? 0.28 : 0,
+    emissiveIntensity: kind === 'bomb' ? 0.95 : kind === 'gem' ? 0.55 : kind === 'coin' ? 0.42 : kind === 'star' ? 0.34 : emissive ? 0.28 : 0,
     flatShading: true,
   })
 }
@@ -259,7 +259,7 @@ function build(kind: Kind): THREE.BufferGeometry {
 export function propTemplate(kind: Kind): PropTemplate {
   const found = templates.get(kind)
   if (found) return found
-  const emissive = kind === 'gem' ? 0x083848 : kind === 'coin' ? 0x4a3208 : kind === 'bomb' ? 0x5a1418 : 0x000000
+  const emissive = kind === 'gem' ? 0x0c4a58 : kind === 'coin' ? 0x6a4810 : kind === 'bomb' ? 0x6a1818 : kind === 'star' ? 0x6a5010 : 0x000000
   const template = { geo: build(kind), mat: matFor(kind, emissive) }
   templates.set(kind, template)
   return template

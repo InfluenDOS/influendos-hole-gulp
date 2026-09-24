@@ -1,5 +1,6 @@
 import * as THREE from 'three'
 import { HoleView } from './holeView'
+import { Motes } from './particles'
 import { propTemplate } from './props'
 import { loadSave } from './save'
 import { createTableMaterial } from './tableMat'
@@ -34,6 +35,8 @@ export class Stage {
   private projected = new THREE.Vector3()
   shakeAmp = 0
   private playing = false
+  private holeLight: THREE.PointLight
+  private motes: Motes
 
   constructor(frame: HTMLElement) {
     this.reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches
@@ -46,12 +49,17 @@ export class Stage {
     this.renderer.domElement.id = 'view'
     frame.appendChild(this.renderer.domElement)
     this.scene.background = new THREE.Color(0x140e0c)
-    const hemi = new THREE.HemisphereLight(0xfff4e6, 0x3a2418, 0.95)
-    const sun = new THREE.DirectionalLight(0xfff7ee, 1.25)
-    sun.position.set(-6, 14, 8)
-    const fill = new THREE.DirectionalLight(0xffc49a, 0.38)
-    fill.position.set(7, 6, -5)
-    this.scene.add(hemi, sun, fill)
+    const hemi = new THREE.HemisphereLight(0xfff6ea, 0x2a160f, 1.05)
+    const sun = new THREE.DirectionalLight(0xfff3e4, 1.45)
+    sun.position.set(-7, 16, 9)
+    const fill = new THREE.DirectionalLight(0xffb27a, 0.42)
+    fill.position.set(8, 5, -4)
+    const rim = new THREE.DirectionalLight(0x9ec4ff, 0.38)
+    rim.position.set(4, 7, -12)
+    this.holeLight = new THREE.PointLight(0xffd8a8, 0.9, 8.5, 2)
+    this.holeLight.position.set(0, 1.35, 0)
+    this.scene.add(hemi, sun, fill, rim, this.holeLight)
+    this.motes = new Motes(this.scene)
     this.menuMat = createTableMaterial()
     this.menuHole = new HoleView()
     this.menuHole.bindSurface(this.menuMat.uniforms)
@@ -181,6 +189,8 @@ export class Stage {
     const ang = this.clock * (this.reduce ? 0.05 : 0.18)
     this.camera.position.set(Math.sin(ang) * 1.6, 3.7, 5.4 + Math.cos(ang) * 0.4)
     this.camera.lookAt(0, -0.55, 0)
+    this.holeLight.position.set(Math.sin(ang) * 0.4, 1.2, 0.2)
+    this.motes.follow(0, 0, this.clock, this.reduce)
   }
 
   snap(focus: { x: number; z: number; holeWorld: number; tableW: number; tableD: number }) {
@@ -200,6 +210,8 @@ export class Stage {
     this.camPos.set(this.look.x + shake * 0.35, height, this.look.z + back)
     this.camera.position.lerp(this.camPos, 1 - Math.exp(-(focus.dragging ? 28 : 8) * dt))
     this.camera.lookAt(this.look.x, -0.5, this.look.z)
+    this.holeLight.position.set(focus.x, 1.25, focus.z)
+    this.motes.follow(this.look.x, this.look.z, this.clock, this.reduce)
     this.shakeAmp *= Math.exp(-8 * dt)
     this.clock += dt
   }
