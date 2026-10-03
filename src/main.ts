@@ -1,6 +1,6 @@
 import './style.css'
-import { openRewardedSlot } from './game/ads'
-import { Arena, failCopy } from './game/arena'
+import { openRewardedSlot, showMidgameAd } from './game/ads'
+import { Arena } from './game/arena'
 import { dragTo, type DragAnchor, type DragKind } from './game/drag'
 import { asset } from './game/assets'
 import { audio } from './game/audio'
@@ -8,6 +8,8 @@ import { warmIcons } from './game/icons'
 import { LEVEL_COUNT } from './game/levels'
 import { grantLevelClear, loadSave, saveGame } from './game/save'
 import { Stage } from './game/stage'
+import { applyDocumentLocale, failCopy, levelHint, levelName, t } from './i18n'
+import { portal } from './portal'
 import { Shell } from './ui/shell'
 
 const frame = document.getElementById('frame')
@@ -27,8 +29,13 @@ let screen: 'title' | 'map' | 'play' | 'checkin' | 'skins' | 'settings' | 'credi
 const held = new Set<string>()
 
 const unlock = () => audio.unlock()
-window.addEventListener('pointerdown', unlock)
-window.addEventListener('keydown', unlock)
+const gesture = { capture: true } as const
+window.addEventListener('pointerdown', unlock, gesture)
+window.addEventListener('pointerup', unlock, gesture)
+window.addEventListener('mousedown', unlock, gesture)
+window.addEventListener('keydown', unlock, gesture)
+window.addEventListener('touchstart', unlock, { capture: true, passive: true })
+window.addEventListener('touchend', unlock, { capture: true, passive: true })
 window.addEventListener('contextmenu', (event) => event.preventDefault())
 
 function fmt(timeLeft: number): string {
@@ -68,7 +75,7 @@ function startFromTitle() {
   const save = loadSave()
   const latest = Math.min(save.unlocked, LEVEL_COUNT)
   const go = () => enterPlay(latest)
-  if (!save.seenHow) {
+  if (!portal.instantPlay && !save.seenHow) {
     shell.showHow(true, () => {
       const data = loadSave()
       data.seenHow = true
@@ -123,6 +130,7 @@ function enterPlay(id: number) {
   screen = 'play'
   levelId = id
   coachOn = id === 1
+  portal.gameplayStop()
   if (arena) {
     stage.remove(arena.root)
     arena.dispose()
@@ -144,23 +152,26 @@ function enterPlay(id: number) {
   current.onFail = () => openFail()
   current.onWin = () => openWin()
   shell.showPlay(
-    current.level.name,
+    levelName(current.level.id),
     current.level.id,
-    current.level.hint,
-    openPause,
+    levelHint(current.level.id),
+    () => openPause(false),
     () => void useTime(),
     () => void useMagnet(),
   )
+  portal.gameplayStart()
 }
 
-function openPause() {
+function openPause(fromVisibility: boolean) {
   if (!arena || (arena.mode !== 'play' && arena.mode !== 'pause')) return
   arena.setMode('pause')
+  if (!fromVisibility) portal.gameplayStop()
   shell.showPause(
-    arena.level.hint,
+    levelHint(arena.level.id),
     () => {
       shell.closeModal()
       arena?.setMode('play')
+      portal.gameplayStart()
     },
     () => enterPlay(levelId),
     () => {
@@ -169,7 +180,7 @@ function openPause() {
       saveGame(data)
       audio.apply(data.settings)
       audio.play('toggle', 0.7)
-      openPause()
+      openPause(false)
     },
     () => {
       mapPage = Math.floor((levelId - 1) / 6)
@@ -180,6 +191,7 @@ function openPause() {
 
 function openFail() {
   if (!arena) return
+  portal.gameplayStop()
   const [title, subtitle] = failCopy(arena.failReason)
   shell.showFail(
     title,
@@ -195,20 +207,25 @@ function openFail() {
   )
 }
 
-function openWin() {
+async function openWin() {
   if (!arena) return
   const result = grantLevelClear(arena.level.id, LEVEL_COUNT, arena.timeLeft, arena.level.time, arena.boostersUsed, arena.revived)
   const last = arena.level.id >= LEVEL_COUNT
+  const info = {
+    stars: result.stars,
+    coins: result.coins,
+    improved: result.improved,
+    timeLeft: arena.timeLeft,
+    clean: arena.boostersUsed === 0 && !arena.revived,
+    name: levelName(arena.level.id),
+    last,
+  }
+  portal.gameplayStop()
+  arena.setMode('win')
+  await showMidgameAd()
+  if (!arena?.alive) return
   shell.showWin(
-    {
-      stars: result.stars,
-      coins: result.coins,
-      improved: result.improved,
-      timeLeft: arena.timeLeft,
-      clean: arena.boostersUsed === 0 && !arena.revived,
-      name: arena.level.name,
-      last,
-    },
+    info,
     () => enterPlay(arena ? Math.min(LEVEL_COUNT, arena.level.id + 1) : levelId),
     () => enterPlay(levelId),
     () => {
@@ -229,14 +246,18 @@ async function useTime() {
     return
   }
   arena.setMode('ad')
-  const ok = await openRewardedSlot(shell.ui, '加时 15 秒')
+  portal.gameplayStop()
+  const ok = await openRewardedSlot()
   if (!arena?.alive) return
   if (!ok) {
     arena.setMode('play')
+    portal.gameplayStart()
+    shell.toast(t('adNoReward'))
     return
   }
   audio.confirm()
   arena.setMode('play')
+  portal.gameplayStart()
   arena.applyTime()
 }
 
@@ -251,30 +272,37 @@ async function useMagnet() {
     return
   }
   arena.setMode('ad')
-  const ok = await openRewardedSlot(shell.ui, '磁铁 8 秒')
+  portal.gameplayStop()
+  const ok = await openRewardedSlot()
   if (!arena?.alive) return
   if (!ok) {
     arena.setMode('play')
+    portal.gameplayStart()
+    shell.toast(t('adNoReward'))
     return
   }
   audio.confirm()
   arena.setMode('play')
+  portal.gameplayStart()
   arena.applyMagnet()
 }
 
 async function revive() {
   if (!arena) return
   arena.setMode('ad')
+  portal.gameplayStop()
   shell.closeModal()
-  const ok = await openRewardedSlot(shell.ui, '复活并加时')
+  const ok = await openRewardedSlot()
   if (!arena.alive) return
   if (!ok) {
     arena.setMode('fail')
+    shell.toast(t('adNoReward'))
     openFail()
     return
   }
   audio.confirm()
   arena.revive()
+  portal.gameplayStart()
 }
 
 function axes() {
@@ -290,7 +318,7 @@ function axes() {
 window.addEventListener('keydown', (event) => {
   held.add(event.key.toLowerCase())
   if (event.key === 'Escape' && screen === 'play' && arena) {
-    if (arena.mode === 'play') openPause()
+    if (arena.mode === 'play') openPause(false)
     else if (arena.mode === 'pause') {
       shell.closeModal()
       arena.setMode('play')
@@ -299,8 +327,10 @@ window.addEventListener('keydown', (event) => {
 })
 window.addEventListener('keyup', (event) => held.delete(event.key.toLowerCase()))
 document.addEventListener('visibilitychange', () => {
-  if (document.hidden && arena?.mode === 'play') openPause()
+  if (!document.hidden) audio.resumeIfAllowed()
+  if (document.hidden && arena?.mode === 'play') openPause(true)
 })
+window.addEventListener('pageshow', () => audio.resumeIfAllowed())
 
 const canvas = stage.renderer.domElement
 
@@ -370,42 +400,67 @@ canvas.addEventListener('pointercancel', (event) => {
   endDrag()
 })
 
+portal.setSuspendHandler((suspended) => {
+  if (suspended) {
+    audio.muteForAd()
+    if (arena?.mode === 'play') {
+      arena.setMode('ad')
+      portal.gameplayStop()
+    }
+    return
+  }
+  audio.unmuteFromAd()
+  if (arena?.mode === 'ad') {
+    arena.setMode('play')
+    portal.gameplayStart()
+  }
+})
+
 const boot = async () => {
+  await portal.init()
+  portal.loadingStart()
   warmIcons()
   audio.apply(loadSave().settings)
+  applyDocumentLocale()
   await Promise.race([
     Promise.all([audio.load(), document.fonts.load('bold 48px "Noto Sans SC"').catch(() => undefined)]),
     new Promise((resolve) => window.setTimeout(resolve, 2000)),
   ])
+  portal.loadingStop()
   document.getElementById('boot')?.remove()
-  showTitle()
+  if (portal.instantPlay) {
+    const save = loadSave()
+    enterPlay(Math.min(LEVEL_COUNT, Math.max(1, save.unlocked)))
+  } else {
+    showTitle()
+  }
 }
 
 let last = performance.now()
 const loop = (now: number) => {
-  const dt = Math.min(0.033, (now - last) / 1000)
+  const dt = Math.min(0.25, Math.max(0, (now - last) / 1000))
   last = now
   if (arena && screen === 'play') {
     const stick = arena.mode === 'play' ? axes() : { x: 0, z: 0 }
     arena.setKeys(stick.x, stick.z)
     arena.update(dt)
     const focus = arena.focus()
-    stage.follow(focus, dt)
+    stage.follow(focus, Math.min(0.05, dt))
     const save = loadSave()
-    const timeLabel = save.timeBoosters > 0 ? `加时 · ${save.timeBoosters}` : '加时 · 广告'
+    const timeLabel = save.timeBoosters > 0 ? t('timeCount', { n: save.timeBoosters }) : t('timeAd')
     const magnetLabel =
       arena.magnetLeft > 0
-        ? `磁铁 ${Math.ceil(arena.magnetLeft)}秒`
+        ? t('magnetLeft', { n: Math.ceil(arena.magnetLeft) })
         : save.magnetBoosters > 0
-          ? `磁铁 · ${save.magnetBoosters}`
-          : '磁铁 · 广告'
+          ? t('magnetCount', { n: save.magnetBoosters })
+          : t('magnetAd')
     shell.syncPlay(fmt(arena.timeLeft), arena.timeLeft <= 8, timeLabel, magnetLabel, arena.chips())
     if (coachOn && arena.mode === 'play') {
       const point = stage.project(focus.x, 0.2, focus.z)
       if (point) shell.placeCoach(point.x, point.y + 36, true)
     }
   } else {
-    stage.updateMenu(dt)
+    stage.updateMenu(Math.min(0.05, dt))
   }
   stage.render()
   requestAnimationFrame(loop)

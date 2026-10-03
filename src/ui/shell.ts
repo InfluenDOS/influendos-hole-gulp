@@ -1,7 +1,8 @@
+import { checkinRewardText, levelName, pageTitle, skinBlurb, skinName, t } from '../i18n'
 import { asset } from '../game/assets'
 import { audio } from '../game/audio'
 import { kindIcon } from '../game/icons'
-import { LEVELS, LEVEL_COUNT, PAGE_TITLES } from '../game/levels'
+import { LEVELS, LEVEL_COUNT } from '../game/levels'
 import {
   CHECKIN_REWARDS,
   checkinView,
@@ -103,37 +104,37 @@ export class Shell {
     const starsN = totalStars(save)
     const latest = Math.min(save.unlocked, LEVEL_COUNT)
     const clearedAll = save.unlocked > LEVEL_COUNT
-    const primary = clearedAll ? '再挑战终关' : save.unlocked > 1 ? '继续闯关' : '开始游戏'
+    const primary = clearedAll ? t('replayFinal') : save.unlocked > 1 ? t('continue') : t('start')
     const root = el('div', 'screen title-screen')
-    root.append(el('p', 'kicker', '超休闲 · 竖屏一口吞'))
+    root.append(el('p', 'kicker', t('kicker')))
     const sign = el('div', 'sign')
-    sign.append(el('h1', '', '黑洞一口吞'), el('p', '', '拖动黑洞，把桌子吃干净'))
+    sign.append(el('h1', '', t('gameTitle')), el('p', '', t('tagline')))
     root.append(sign)
     const stack = el('div', 'stack')
     stack.append(
       button(primary, 'green', actions.onStart),
-      button('关卡地图', 'blue', actions.onMap),
+      button(t('levelMap'), 'blue', actions.onMap),
     )
     const row = el('div', 'row')
-    const checkin = button('签到', 'yellow', actions.onCheckin)
+    const checkin = button(t('checkin'), 'yellow', actions.onCheckin)
     if (checkinView(save).canClaim) checkin.append(el('i', 'dot'))
-    row.append(checkin, button('皮肤', 'grey', actions.onSkins), button('设置', 'grey', actions.onSettings))
+    row.append(checkin, button(t('skins'), 'grey', actions.onSkins), button(t('settings'), 'grey', actions.onSettings))
     stack.append(row)
     root.append(stack)
-    root.append(el('p', 'status', `第 ${latest} 关可玩 · ${starsN} 星 · ${save.coins} 金币`))
+    root.append(el('p', 'status', t('status', { level: latest, stars: starsN, coins: save.coins })))
     const foot = el('div', 'row')
-    foot.append(button('怎么玩', 'grey', actions.onHow), button('致谢', 'grey', actions.onCredits))
+    foot.append(button(t('how'), 'grey', actions.onHow), button(t('credits'), 'grey', actions.onCredits))
     root.append(foot)
     this.ui.append(root)
   }
 
   showHow(thenStart: boolean, onClose: () => void) {
-    this.openModal('怎么玩', '', [
-      '1. 按住地面，拖动黑洞',
-      '2. 小的会翻滚掉进洞里，洞才会变大',
-      '3. 炸弹、辣椒、仙人掌会失败',
-      '三星：剩余时间过半，且不用道具和复活',
-    ], [button(thenStart ? '开始吞噬' : '知道了', 'green', onClose)])
+    this.openModal(t('how'), '', [
+      t('how1'),
+      t('how2'),
+      t('how3'),
+      t('howStars'),
+    ], [button(thenStart ? t('startGulp') : t('gotIt'), 'green', onClose)])
   }
 
   showMap(page: number, onBack: () => void, onPick: (id: number) => void, onPage: (page: number) => void) {
@@ -142,9 +143,9 @@ export class Shell {
     const pageCount = Math.ceil(LEVELS.length / 6)
     const root = el('div', 'screen map-screen')
     const head = el('div', 'topbar')
-    head.append(button('返回', 'grey', onBack), el('div', 'top-copy'))
+    head.append(button(t('back'), 'grey', onBack), el('div', 'top-copy'))
     const copy = head.querySelector('.top-copy') as HTMLElement
-    copy.append(el('h2', '', '关卡地图'), el('p', '', `${PAGE_TITLES[page] ?? ''} · ${totalStars(save)} / ${LEVELS.length * 3} 星`))
+    copy.append(el('h2', '', t('levelMap')), el('p', '', `${pageTitle(page)} · ${totalStars(save)} / ${LEVELS.length * 3}`))
     root.append(head)
     const list = el('div', 'map-list')
     const slice = LEVELS.slice(page * 6, page * 6 + 6)
@@ -154,12 +155,12 @@ export class Shell {
       const current = level.id === Math.min(save.unlocked, LEVELS.length)
       const card = el('button', `map-card${open ? '' : ' locked'}${current ? ' current' : ''}`)
       card.type = 'button'
-      card.append(el('b', '', String(level.id)), el('span', '', level.name))
+      card.append(el('b', '', String(level.id)), el('span', '', levelName(level.id)))
       if (open) card.append(stars(earned))
-      else card.append(el('em', '', '未解锁'))
+      else card.append(el('em', '', t('locked')))
       card.addEventListener('click', () => {
         if (!open) {
-          this.toast('先通过上一关')
+          this.toast(t('clearPrevious'))
           audio.play('error', 0.6)
           return
         }
@@ -171,9 +172,9 @@ export class Shell {
     root.append(list)
     const pager = el('div', 'pager')
     pager.append(
-      button('上一页', page === 0 ? 'grey' : 'blue', () => page > 0 && onPage(page - 1)),
+      button(t('prevPage'), page === 0 ? 'grey' : 'blue', () => page > 0 && onPage(page - 1)),
       el('span', '', `${page + 1} / ${pageCount}`),
-      button('下一页', page >= pageCount - 1 ? 'grey' : 'blue', () => page < pageCount - 1 && onPage(page + 1)),
+      button(t('nextPage'), page >= pageCount - 1 ? 'grey' : 'blue', () => page < pageCount - 1 && onPage(page + 1)),
     )
     root.append(pager)
     this.ui.append(root)
@@ -183,22 +184,22 @@ export class Shell {
     this.clear()
     const hud = el('div', 'hud')
     const head = el('header')
-    head.append(button('暂停', 'grey', onPause))
+    head.append(button(t('pause'), 'grey', onPause))
     const titles = el('div', 'titles')
-    titles.append(el('small', '', `第 ${levelId} 关`), el('strong', '', levelName))
+    titles.append(el('small', '', t('levelN', { n: levelId })), el('strong', '', levelName))
     head.append(titles)
     this.timer = el('div', 'timer', '0:00')
     head.append(this.timer)
     const chips = el('div', 'chips')
     const hintEl = el('p', 'hint', hint)
-    this.coach = el('div', 'coach', '按住拖动')
+    this.coach = el('div', 'coach', t('dragCoach'))
     this.coach.hidden = levelId !== 1
     const foot = el('footer')
-    this.timeBtn = button('加时', 'yellow', onTime)
-    this.magnetBtn = button('磁铁', 'blue', onMagnet)
+    this.timeBtn = button(t('timeAd'), 'yellow', onTime)
+    this.magnetBtn = button(t('magnetAd'), 'blue', onMagnet)
     foot.append(this.timeBtn, this.magnetBtn)
     this.floats = el('div', 'floats')
-    const banner = el('div', 'banner', `第 ${levelId} 关  ${levelName}`)
+    const banner = el('div', 'banner', `${t('levelN', { n: levelId })}  ${levelName}`)
     hud.append(head, chips, hintEl, this.coach, foot, this.floats, banner)
     window.setTimeout(() => banner.classList.add('hide'), 900)
     window.setTimeout(() => banner.remove(), 1400)
@@ -266,32 +267,32 @@ export class Shell {
 
   showPause(hint: string, onResume: () => void, onRestart: () => void, onToggleSfx: () => void, onMap: () => void) {
     const save = loadSave()
-    this.openModal('暂停', hint, ['三星：剩余时间过半，且没用道具或复活'], [
-      button('继续', 'green', onResume),
-      button('重新开始', 'blue', onRestart),
-      button(`音效：${save.settings.sfx ? '开' : '关'}`, 'yellow', onToggleSfx),
-      button('关卡地图', 'grey', onMap),
+    this.openModal(t('paused'), hint, [t('howStars')], [
+      button(t('resume'), 'green', onResume),
+      button(t('restart'), 'blue', onRestart),
+      button(save.settings.sfx ? t('soundOn') : t('soundOff'), 'yellow', onToggleSfx),
+      button(t('levelMap'), 'grey', onMap),
     ])
   }
 
   showFail(title: string, subtitle: string, left: number, revived: boolean, onRevive: (() => void) | null, onRestart: () => void, onMap: () => void) {
     const buttons = []
-    if (onRevive) buttons.push(button('看视频复活', 'yellow', onRevive))
-    buttons.push(button('重新开始', 'green', onRestart), button('返回地图', 'blue', onMap))
-    this.openModal(title, subtitle, [`还差 ${left} 个目标`, revived ? '本局已经复活过一次' : '复活后加 12 秒，并短暂无敌'], buttons)
+    if (onRevive) buttons.push(button(t('watchRevive'), 'yellow', onRevive))
+    buttons.push(button(t('restart'), 'green', onRestart), button(t('backToMap'), 'blue', onMap))
+    this.openModal(title, subtitle, [t('targetsLeft', { n: left }), revived ? t('revivedOnce') : t('reviveHelp')], buttons)
   }
 
   showWin(info: WinInfo, onNext: () => void, onAgain: () => void, onMap: () => void) {
-    const title = info.stars === 3 ? '完美一口' : info.stars === 2 ? '漂亮' : '过关'
+    const title = info.stars === 3 ? t('winPerfect') : info.stars === 2 ? t('winNice') : t('winClear')
     const lines = [
-      info.coins > 0 ? `金币 +${info.coins}` : info.improved ? '新纪录' : '星级没有超过上次',
-      `剩余 ${Math.ceil(info.timeLeft)} 秒`,
-      info.clean ? '干净通关可以拿到三星' : '用了道具或复活，最多两星',
+      info.coins > 0 ? t('coinsGain', { n: info.coins }) : info.improved ? t('newRecord') : t('noImprove'),
+      t('secondsLeft', { n: Math.ceil(info.timeLeft) }),
+      info.clean ? t('cleanStar') : t('spentStar'),
     ]
     const buttons = [
-      button(info.last ? '再挑战终关' : '下一关', 'green', info.last ? onAgain : onNext),
-      button('再玩一次', 'blue', onAgain),
-      button('关卡地图', 'grey', onMap),
+      button(info.last ? t('replayFinal') : t('nextLevel'), 'green', info.last ? onAgain : onNext),
+      button(t('playAgain'), 'blue', onAgain),
+      button(t('levelMap'), 'grey', onMap),
     ]
     this.openModal(title, info.name, lines, buttons, info.stars)
   }
@@ -302,22 +303,22 @@ export class Shell {
     const view = checkinView(save)
     const root = el('div', 'screen sheet')
     const head = el('div', 'topbar')
-    head.append(button('返回', 'grey', onBack), el('h2', '', '每日签到'))
-    root.append(head, el('p', 'note', view.note), el('p', 'gold', `当前金币 ${save.coins}`))
+    head.append(button(t('back'), 'grey', onBack), el('h2', '', t('dailyTitle')))
+    root.append(head, el('p', 'note', view.note), el('p', 'gold', t('coinsNow', { n: save.coins })))
     const list = el('div', 'check-list')
     CHECKIN_REWARDS.forEach((reward, index) => {
       const day = index + 1
       const today = day === view.today
       const claimed = day <= view.claimed
       const row = el('div', `check-row${today ? ' today' : ''}`)
-      row.append(el('b', '', `第${day}天`), el('span', '', reward.label))
-      const state = claimed ? '已领取' : today && view.canClaim ? '今天' : today ? '已领取' : '未到'
+      row.append(el('b', '', t('dayN', { n: day })), el('span', '', checkinRewardText(reward.coins, reward.magnet)))
+      const state = claimed ? t('claimed') : today && view.canClaim ? t('today') : today ? t('claimed') : t('later')
       row.append(el('em', claimed || (today && !view.canClaim) ? 'ok' : '', state))
       list.append(row)
     })
     root.append(list)
     root.append(
-      button(view.canClaim ? '领取今日奖励' : '今天已经领过', view.canClaim ? 'yellow' : 'grey', () => {
+      button(view.canClaim ? t('claimToday') : t('claimedToday'), view.canClaim ? 'yellow' : 'grey', () => {
         if (!view.canClaim) return
         const result = claimCheckin()
         if (!result.ok) {
@@ -328,7 +329,7 @@ export class Shell {
         this.showCheckin(onBack)
       }),
     )
-    root.append(el('p', 'fine', '签到存在这台设备上，断签会从第 1 天重来'))
+    root.append(el('p', 'fine', t('checkinFine')))
     this.ui.append(root)
   }
 
@@ -338,9 +339,9 @@ export class Shell {
     refreshUnlocks(save)
     const root = el('div', 'screen sheet')
     const head = el('div', 'topbar')
-    head.append(button('返回', 'grey', onBack))
+    head.append(button(t('back'), 'grey', onBack))
     const copy = el('div', 'top-copy')
-    copy.append(el('h2', '', '黑洞皮肤'), el('p', '', `${save.coins} 金币 · ${totalStars(save)} 星`))
+    copy.append(el('h2', '', t('skinsTitle')), el('p', '', t('skinStatus', { coins: save.coins, stars: totalStars(save) })))
     head.append(copy)
     root.append(head)
     const list = el('div', 'skin-list')
@@ -352,20 +353,20 @@ export class Shell {
       preview.style.setProperty('--rim', `#${skin.rimHi.toString(16).padStart(6, '0')}`)
       preview.style.setProperty('--void', `#${skin.void.toString(16).padStart(6, '0')}`)
       const text = el('div')
-      text.append(el('h3', '', skin.name), el('p', '', skin.desc))
+      text.append(el('h3', '', skinName(skin.id)), el('p', '', skinBlurb(skin.id)))
       const extra =
         skin.price <= 0
-          ? '默认拥有'
+          ? t('skinFree')
           : owned
-            ? '已解锁'
-            : `${skin.price} 金币${skin.freeLevel ? ` · 或通关第 ${skin.freeLevel} 关` : ''}${skin.freeStars ? ` · 或 ${skin.freeStars} 星` : ''}`
+            ? t('skinOwned')
+            : `${t('skinPrice', { price: skin.price })}${skin.freeLevel ? t('skinOrLevel', { n: skin.freeLevel }) : ''}${skin.freeStars ? t('skinOrStars', { n: skin.freeStars }) : ''}`
       text.append(el('small', '', extra))
       const tone: Tone = equipped ? 'grey' : owned ? 'green' : 'yellow'
-      const label = equipped ? '使用中' : owned ? '使用' : '解锁'
+      const label = equipped ? t('equipped') : owned ? t('useSkin') : t('unlock')
       card.append(preview, text, button(label, tone, () => this.pickSkin(skin.id, onBack), equipped))
       list.append(card)
     }
-    root.append(list, el('p', 'fine', '通关或攒星也会免费解锁，不必只靠金币'))
+    root.append(list, el('p', 'fine', t('skinFine')))
     this.ui.append(root)
   }
 
@@ -374,12 +375,12 @@ export class Shell {
     const save = loadSave()
     const root = el('div', 'screen sheet')
     const head = el('div', 'topbar')
-    head.append(button('返回', 'grey', onBack), el('h2', '', '设置'))
+    head.append(button(t('back'), 'grey', onBack), el('h2', '', t('settings')))
     root.append(head)
     const rows: { title: string; detail: string; key: 'sfx' | 'music' | 'vibrate' }[] = [
-      { title: '音效', detail: '吞噬、按钮和失败声', key: 'sfx' },
-      { title: '音乐', detail: '菜单和局内的轻音乐', key: 'music' },
-      { title: '震动', detail: '吞大和失败时短震一下', key: 'vibrate' },
+      { title: t('sfx'), detail: t('sfxDetail'), key: 'sfx' },
+      { title: t('music'), detail: t('musicDetail'), key: 'music' },
+      { title: t('vibrate'), detail: t('vibrateDetail'), key: 'vibrate' },
     ]
     for (const row of rows) {
       const on = save.settings[row.key]
@@ -388,7 +389,7 @@ export class Shell {
       text.append(el('h3', '', row.title), el('p', '', row.detail))
       card.append(
         text,
-        button(on ? '已开' : '已关', on ? 'green' : 'grey', () => {
+        button(on ? t('on') : t('off'), on ? 'green' : 'grey', () => {
           const data = loadSave()
           data.settings[row.key] = !data.settings[row.key]
           saveGame(data)
@@ -399,9 +400,9 @@ export class Shell {
       )
       root.append(card)
     }
-    root.append(button('素材致谢', 'blue', onCredits))
-    root.append(el('p', 'note', '进度、星级、皮肤和签到都保存在本地。'))
-    root.append(el('p', 'note', '清除浏览器网站数据会丢掉存档。'))
+    root.append(button(t('creditsTitle'), 'blue', onCredits))
+    root.append(el('p', 'note', t('settingsNote1')))
+    root.append(el('p', 'note', t('settingsNote2')))
     this.ui.append(root)
   }
 
@@ -409,21 +410,21 @@ export class Shell {
     this.clear()
     const root = el('div', 'screen sheet')
     const card = el('article', 'credits')
-    card.append(el('h2', '', '素材致谢'))
+    card.append(el('h2', '', t('creditsTitle')))
     const lines = [
-      '三维食物、炸弹、木块和黑洞用简单几何体搭建，是本项目原创。',
-      '界面按钮、星星、箭头来自 Kenney UI Pack。',
-      '吞噬碎屑来自 Kenney Particle Pack。',
-      '按钮与撞击声来自 Kenney Interface Sounds、Impact Sounds。',
-      '以上 Kenney 素材均为 CC0 1.0，可商用，署名非强制。',
-      '作者 Kenney · kenney.nl',
-      '中文界面字体为 Noto Sans CJK SC 子集。',
-      '字体许可：SIL Open Font License 1.1。',
-      '吞噬 whoosh、失败嗡声、过关旋律和背景音乐为原创合成。',
-      '激励视频是试投占位，不会请求广告网络。',
+      t('credit1'),
+      t('credit2'),
+      t('credit3'),
+      t('credit4'),
+      t('credit5'),
+      t('credit6'),
+      t('credit7'),
+      t('credit8'),
+      t('credit9'),
+      t('credit10'),
     ]
     for (const line of lines) card.append(el('p', '', line))
-    root.append(card, button('返回', 'green', onBack))
+    root.append(card, button(t('back'), 'green', onBack))
     this.ui.append(root)
   }
 
@@ -441,7 +442,7 @@ export class Shell {
     if (!skin || save.skin === id) return
     if (!save.owned.includes(id)) {
       if (save.coins < skin.price || skin.price <= 0) {
-        this.toast('金币不够')
+        this.toast(t('notEnough'))
         audio.play('error', 0.6)
         return
       }

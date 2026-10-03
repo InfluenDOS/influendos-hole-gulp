@@ -160,4 +160,40 @@ assert(focus.x < beforeFree.x - 0.3 && focus.z > beforeFree.z + 0.15, `free drag
 assert(inside(focus.x, focus.z), 'free drag left the table')
 
 arena.dispose()
+
+function withSeed<T>(run: () => T): T {
+  const saved = Math.random
+  let seed = 1
+  Math.random = () => {
+    seed = (seed * 16807) % 2147483647
+    return (seed - 1) / 2147483646
+  }
+  try {
+    return run()
+  } finally {
+    Math.random = saved
+  }
+}
+
+function pose(hz: number) {
+  return withSeed(() => {
+    const run = new Arena(1, true)
+    run.setKeys(1, 0)
+    const frame = 1 / hz
+    const frames = Math.round(hz * 2)
+    for (let i = 0; i < frames; i++) run.update(frame)
+    const focus = run.focus()
+    const time = run.timeLeft
+    run.dispose()
+    return { x: focus.x, z: focus.z, time }
+  })
+}
+
+const at60 = pose(60)
+const at120 = pose(120)
+const at144 = pose(144)
+assert(Math.abs(at60.x - at120.x) < 1e-6 && Math.abs(at60.z - at120.z) < 1e-6, `120Hz drifted from 60Hz: ${at120.x},${at120.z} vs ${at60.x},${at60.z}`)
+assert(Math.abs(at60.x - at144.x) < 1e-6 && Math.abs(at60.z - at144.z) < 1e-6, `144Hz drifted from 60Hz: ${at144.x},${at144.z} vs ${at60.x},${at60.z}`)
+assert(Math.abs(at60.time - at120.time) < 1e-6 && Math.abs(at60.time - at144.time) < 1e-6, `timer drifted: ${at60.time} ${at120.time} ${at144.time}`)
+
 console.log('drag bounds ok')

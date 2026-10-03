@@ -1,9 +1,11 @@
 import { Body, Box, GSSolver, Plane, SAPBroadphase, Sphere, Vec3, World } from 'cannon-es'
 import * as THREE from 'three'
 import { audio } from './audio'
+import { FIXED_STEP, planSteps, type StepClock } from './fixedStep'
+import { failCopy, kindName, t } from '../i18n'
 import { BOMB_RADIUS, BOMB_RATIO, GULP_RATIO, TIER_RADIUS, canEat, growAmount, type Tier } from './balance'
 import { HoleView } from './holeView'
-import { KIND_COLOR, KIND_NAME, type Kind } from './kinds'
+import { KIND_COLOR, type Kind } from './kinds'
 import { followDrag, type DragKind } from './drag'
 import { clampToTable, pxRadius, pxToWorld, tableWorld, type TableWorld } from './layout'
 import { getLevel, levelRows, targetKinds, type LevelDef, type Role } from './levels'
@@ -48,15 +50,7 @@ type Actor = {
 
 export type ChipState = { kind: Kind; name: string; have: number; need: number }
 
-const FAIL_COPY: Record<FailReason, [string, string]> = {
-  bomb: ['吞到炸弹了', '黑洞被炸得晕头转向'],
-  decoy: ['这个不能吞', '辣椒和仙人掌不在菜单上'],
-  time: ['时间到了', '再快一点点就吃完了'],
-}
-
-export function failCopy(reason: FailReason): [string, string] {
-  return FAIL_COPY[reason]
-}
+export { failCopy }
 
 export class Arena {
   readonly root = new THREE.Group()
@@ -103,7 +97,7 @@ export class Arena {
     decoy: THREE.Material
   } | null = null
   private reduce: boolean
-  private acc = 0
+  private stepClock: StepClock = { elapsed: 0, simSteps: 0 }
   private ended = false
   private sealing = false
   private sealT = 0
@@ -227,13 +221,13 @@ export class Arena {
   applyTime() {
     this.timeLeft += 15
     this.boostersUsed += 1
-    this.float(this.hx, 0.8, this.hz, '+15 秒', '#fff6ea')
+    this.float(this.hx, 0.8, this.hz, t('plusTime'), '#fff6ea')
   }
 
   applyMagnet() {
     this.magnetT += 8
     this.boostersUsed += 1
-    this.float(this.hx, 0.8, this.hz, '磁铁开启', '#bff6ff')
+    this.float(this.hx, 0.8, this.hz, t('magnetOn'), '#bff6ff')
     audio.play('open', 0.7)
   }
 
@@ -247,7 +241,7 @@ export class Arena {
     this.timeLeft += 12
     this.invuln = 1.8
     this.mode = 'play'
-    this.float(this.hx, 0.9, this.hz, '复活 +12 秒', '#fff6ea')
+    this.float(this.hx, 0.9, this.hz, t('reviveFloat'), '#fff6ea')
   }
 
   chips(): ChipState[] {
@@ -263,7 +257,7 @@ export class Arena {
     }
     return kinds.map((kind) => ({
       kind,
-      name: KIND_NAME[kind],
+      name: kindName(kind),
       have: have.get(kind) ?? 0,
       need: need.get(kind) ?? 0,
     }))
@@ -291,52 +285,63 @@ export class Arena {
   update(dt: number) {
     if (this.ended) return
     this.clampHole()
-    const clamped = Math.min(0.05, dt)
-    this.clock += clamped
-    if (this.mode === 'play') {
-      this.timeLeft -= clamped
-      this.magnetT = Math.max(0, this.magnetT - clamped)
-      this.invuln = Math.max(0, this.invuln - clamped)
-      if (this.timeLeft <= 0) {
-        this.timeLeft = 0
-        if (this.targetsLeft() === 0) this.timeLeft = 0.05
-        else this.fail('time', null)
-      } else {
-        this.acc += clamped
-        let steps = 0
-        const step = 1 / 60
-        while (this.acc >= step && steps < 3 && this.mode === 'play') {
-          this.moveHole(step)
-          this.influence(step)
-          this.world.step(step)
-          this.acc -= step
-          steps += 1
+    const frame = Number.isFinite(dt) ? Math.min(0.25, Math.max(0, dt)) : 0
+    const planned = planSteps(this.stepClock, frame, this.mode === 'play')
+    for (let i = 0; i < planned.steps && this.mode === 'play' && !this.ended; i++) {
+      this.fixedUpdate(FIXED_STEP)
+    }
+    this.stepClock = planned.clock
+    this.present(frame)
+  }
+
+  /** One simulation slice. `dt` is always FIXED_STEP. */
+  private fixedUpdate(dt: number) {
+    this.clock += dt
+    this.timeLeft -= dt
+    this.magnetT = Math.max(0, this.magnetT - dt)
+    this.invuln = Math.max(0, this.invuln - dt)
+    if (this.timeLeft <= 0) {
+      this.timeLeft = 0
+      if (this.targetsLeft() === 0) this.timeLeft = 0.05
+      else this.fail('time', null)
+      return
+    }
+    this.moveHole(dt)
+    this.influence(dt)
+    this.world.step(dt)
+    this.settleActors()
+    this.finishFalls()
+    if (this.sealing) {
+      this.sealT += dt
+      if (this.sealT > 1.1) {
+        for (const actor of this.actors) {
+          if (actor.role === 'target' && actor.falling && !actor.gone) this.finishActor(actor)
         }
-        if (steps === 3) this.acc = 0
-        this.finishFalls()
-        if (this.sealing) {
-          this.sealT += clamped
-          if (this.sealT > 1.1) {
-            for (const actor of this.actors) {
-              if (actor.role === 'target' && actor.falling && !actor.gone) this.finishActor(actor)
-            }
-          }
-        }
-        this.feedSnacks()
-      }
-      const sec = Math.ceil(this.timeLeft)
-      if (sec <= 8 && sec !== this.lastTick && this.mode === 'play') {
-        this.lastTick = sec
-        audio.tick()
       }
     }
-    this.punch += (1 - this.punch) * Math.min(1, clamped * 8)
+    this.feedSnacks()
+    const sec = Math.ceil(this.timeLeft)
+    if (sec <= 8 && sec !== this.lastTick && this.mode === 'play') {
+      this.lastTick = sec
+      audio.tick()
+    }
+  }
+
+  private present(dt: number) {
+    this.punch += (1 - this.punch) * Math.min(1, dt * 8)
     this.clampHole()
     this.syncMeshes()
-    this.bursts.update(clamped)
+    this.bursts.update(dt)
     this.hole.setMagnet(this.magnetT > 0, this.clock)
     this.hole.setAlpha(this.invuln > 0 && Math.sin(this.clock * 22) > 0 ? 0.35 : 1)
     this.hole.update(this.clock, this.reduce)
+  }
+
+  private settleActors() {
+    for (const actor of this.actors) {
+      if (actor.gone || actor.falling) continue
+      if (actor.body.position.y < actor.worldR) actor.body.position.y = actor.worldR
+    }
   }
 
   private syncHole() {
@@ -469,7 +474,7 @@ export class Arena {
           actor.bumpT = 0.55
           audio.bump()
           this.onShake?.(0.05)
-          this.float(body.position.x, actor.worldR + 0.3, body.position.z, '太大了', '#fff6ea')
+          this.float(body.position.x, actor.worldR + 0.3, body.position.z, t('tooBig'), '#fff6ea')
         }
         continue
       }
@@ -550,7 +555,7 @@ export class Arena {
     else this.combo = 1
     this.lastGulp = this.clock
     if (actor.role !== 'filler' && (this.combo === 2 || (this.combo >= 5 && this.combo % 5 === 0))) {
-      this.float(this.hx, 0.9, this.hz, `连吞 x${this.combo}`, '#ffe08a')
+      this.float(this.hx, 0.9, this.hz, t('combo', { n: this.combo }), '#ffe08a')
     }
   }
 
@@ -706,7 +711,6 @@ export class Arena {
       }
       const body = actor.body
       const y = actor.falling ? body.position.y : Math.max(actor.worldR * 0.92, body.position.y)
-      if (!actor.falling && body.position.y < actor.worldR) body.position.y = actor.worldR
       const sink = actor.falling ? Math.max(0.2, 1 + Math.min(0, y) * 0.46) : 1
       const pulse = actor.role === 'bomb' ? 1 + Math.sin(this.clock * 8 + actor.phase) * 0.08 : 1
       this.dummy.position.set(body.position.x, y, body.position.z)

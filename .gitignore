@@ -1,5 +1,6 @@
 node_modules
 dist
+dist-portals
 .DS_Store
 *.log
 .vite

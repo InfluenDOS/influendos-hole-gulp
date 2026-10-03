@@ -1,3 +1,4 @@
+import { checkinRewardText, t } from '../i18n'
 import { rateStars } from './balance'
 import { SKINS, type SkinId } from './skinData'
 
@@ -23,14 +24,14 @@ export type SaveData = {
   seenHow: boolean
 }
 
-export const CHECKIN_REWARDS: { coins: number; magnet: number; label: string }[] = [
-  { coins: 20, magnet: 0, label: '20 金币' },
-  { coins: 30, magnet: 0, label: '30 金币' },
-  { coins: 40, magnet: 0, label: '40 金币' },
-  { coins: 50, magnet: 0, label: '50 金币' },
-  { coins: 70, magnet: 0, label: '70 金币' },
-  { coins: 90, magnet: 0, label: '90 金币' },
-  { coins: 120, magnet: 1, label: '120 金币 + 磁铁' },
+export const CHECKIN_REWARDS: { coins: number; magnet: number }[] = [
+  { coins: 20, magnet: 0 },
+  { coins: 30, magnet: 0 },
+  { coins: 40, magnet: 0 },
+  { coins: 50, magnet: 0 },
+  { coins: 70, magnet: 0 },
+  { coins: 90, magnet: 0 },
+  { coins: 120, magnet: 1 },
 ]
 
 function fresh(): SaveData {
@@ -172,34 +173,34 @@ export function checkinView(data = loadSave()): CheckinView {
   const today = todayKey()
   const yday = yesterdayKey()
   if (last === today) {
-    return { claimed: streak, today: streak, canClaim: false, note: `已连续签到 ${streak} 天` }
+    return { claimed: streak, today: streak, canClaim: false, note: t('checkinStreak', { n: streak }) }
   }
   if (last === yday && streak > 0 && streak < 7) {
     return {
       claimed: streak,
       today: streak + 1,
       canClaim: true,
-      note: `已连续 ${streak} 天，今天是第 ${streak + 1} 天`,
+      note: t('checkinNext', { streak, day: streak + 1 }),
     }
   }
   if (last === yday && streak >= 7) {
-    return { claimed: 0, today: 1, canClaim: true, note: '上一轮签满了，新的一轮从今天开始' }
+    return { claimed: 0, today: 1, canClaim: true, note: t('checkinReset') }
   }
   if (last) {
-    return { claimed: 0, today: 1, canClaim: true, note: '中间断过，从第 1 天重新开始' }
+    return { claimed: 0, today: 1, canClaim: true, note: t('checkinBroken') }
   }
-  return { claimed: 0, today: 1, canClaim: true, note: '第一天签到，领一份见面金币' }
+  return { claimed: 0, today: 1, canClaim: true, note: t('checkinFirst') }
 }
 
 export function claimCheckin(): { ok: boolean; label: string } {
   const data = loadSave()
   const view = checkinView(data)
-  if (!view.canClaim) return { ok: false, label: '今天已经领过了' }
+  if (!view.canClaim) return { ok: false, label: t('checkinAlready') }
   const reward = CHECKIN_REWARDS[view.today - 1]
   data.checkin.last = todayKey()
   data.checkin.streak = view.today
   data.coins += reward.coins
   data.magnetBoosters += reward.magnet
   saveGame(data)
-  return { ok: true, label: reward.label }
+  return { ok: true, label: checkinRewardText(reward.coins, reward.magnet) }
 }

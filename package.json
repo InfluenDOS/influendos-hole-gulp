@@ -7,6 +7,8 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
+    "build:portals": "node scripts/build-portals.mjs",
+    "check": "vite-node scripts/check-drag-bounds.ts && vite-node scripts/check-portal.ts",
     "preview": "vite preview"
   },
   "dependencies": {
@@ -16,6 +18,7 @@
   "devDependencies": {
     "@types/three": "^0.186.0",
     "typescript": "^5.7.3",
-    "vite": "^6.3.5"
+    "vite": "^6.3.5",
+    "vite-node": "^3.2.4"
   }
 }
