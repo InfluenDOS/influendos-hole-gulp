@@ -38,6 +38,8 @@ class AudioBus {
   private step = 0
   private nextNote = 0
   private noise: AudioBuffer | null = null
+  private adMutes = 0
+  private primed = false
 
   async load() {
     await Promise.all(
@@ -62,27 +64,77 @@ class AudioBus {
     this.bed = bed
   }
 
+  /**
+   * Create and resume the context inside a user gesture.
+   * iOS Safari ignores a context that was constructed earlier, and it also
+   * ignores resume() unless a buffer is started in the same turn.
+   */
   unlock() {
-    if (!this.ctx) {
-      const Ctx = window.AudioContext || (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext
-      if (!Ctx) return
-      this.ctx = new Ctx()
-      this.master = this.ctx.createGain()
-      this.master.gain.value = 0.9
-      this.master.connect(this.ctx.destination)
-      this.noise = this.makeNoise()
-      for (const [name, raw] of this.raw) {
-        void this.ctx.decodeAudioData(raw.slice(0)).then((buf) => {
-          this.buffers.set(name, buf)
-        }).catch(() => undefined)
-      }
-    }
-    if (this.ctx.state === 'suspended') void this.ctx.resume()
+    const ctx = this.ensureContext()
+    if (!ctx || !this.master) return
+    if (this.primed && ctx.state === 'running') return
+    if (ctx.state !== 'running') void ctx.resume()
+    this.prime(ctx)
     this.startClock()
   }
 
+  /** Resume after a tab switch. Does not create a context outside a gesture. */
+  resumeIfAllowed() {
+    if (!this.ctx || this.ctx.state !== 'suspended') return
+    void this.ctx.resume()
+  }
+
+  muteForAd() {
+    this.adMutes += 1
+    this.applyMaster()
+    if (this.ctx) this.nextNote = this.ctx.currentTime + 0.2
+  }
+
+  unmuteFromAd() {
+    this.adMutes = Math.max(0, this.adMutes - 1)
+    this.applyMaster()
+  }
+
+  private ensureContext(): AudioContext | null {
+    if (this.ctx) return this.ctx
+    const Ctx = window.AudioContext || (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext
+    if (!Ctx) return null
+    this.ctx = new Ctx()
+    this.master = this.ctx.createGain()
+    this.applyMaster()
+    this.master.connect(this.ctx.destination)
+    this.noise = this.makeNoise()
+    for (const [name, raw] of this.raw) {
+      void this.ctx.decodeAudioData(raw.slice(0)).then((buf) => {
+        this.buffers.set(name, buf)
+      }).catch(() => undefined)
+    }
+    return this.ctx
+  }
+
+  private prime(ctx: AudioContext) {
+    if (!this.master) return
+    const length = Math.max(1, Math.floor(ctx.sampleRate * 0.02))
+    const buffer = ctx.createBuffer(1, length, ctx.sampleRate)
+    const src = ctx.createBufferSource()
+    src.buffer = buffer
+    src.connect(this.master)
+    try {
+      src.start(0)
+      this.primed = true
+    } catch {
+      /* a second gesture will try again */
+    }
+  }
+
+  private applyMaster() {
+    if (!this.master || !this.ctx) return
+    const value = this.adMutes > 0 ? 0 : 0.9
+    this.master.gain.setValueAtTime(value, this.ctx.currentTime)
+  }
+
   play(name: string, volume = 0.8) {
-    if (!this.sfxOn || !this.ctx || !this.master) return
+    if (!this.sfxOn || this.adMutes > 0 || !this.ctx || !this.master) return
     const buf = this.buffers.get(name)
     if (!buf) return
     const src = this.ctx.createBufferSource()
@@ -140,7 +192,10 @@ class AudioBus {
   }
 
   private advanceMusic() {
-    if (!this.ctx || !this.musicOn) return
+    if (!this.ctx || !this.musicOn || this.adMutes > 0) {
+      if (this.ctx) this.nextNote = this.ctx.currentTime + 0.2
+      return
+    }
     const now = this.ctx.currentTime
     while (this.nextNote < now + 0.12) {
       const degree = MELODY[this.step % MELODY.length]

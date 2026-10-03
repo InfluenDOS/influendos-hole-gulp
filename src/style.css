@@ -6,7 +6,7 @@
   --line: #e4c7a4;
   --good: #1f9d55;
   --danger: #e23b2f;
-  font-family: "Noto Sans SC", "PingFang SC", "Noto Sans CJK SC", "Microsoft YaHei", sans-serif;
+  font-family: "Noto Sans SC", "PingFang SC", "Noto Sans CJK SC", "Microsoft YaHei", system-ui, "Segoe UI", sans-serif;
 }
 
 html,
@@ -20,22 +20,40 @@ body,
   touch-action: none;
   user-select: none;
   -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  overscroll-behavior: none;
+}
+
+html,
+body {
+  position: fixed;
+  inset: 0;
 }
 
 #app {
   display: flex;
   align-items: center;
   justify-content: center;
+  container-type: size;
 }
 
 #frame {
   position: relative;
   height: 100%;
-  width: min(100vw, calc(100vh * 9 / 16));
+  width: min(100%, calc(100vh * 9 / 16));
+  max-width: 100%;
   max-height: 100%;
   overflow: hidden;
   background: #140e0c;
-  font-size: calc(min(100vh, 100vw * 16 / 9) * 0.022);
+  container-type: size;
+  font-size: clamp(13px, 2.4vh, 22px);
+}
+
+@supports (width: 1cqi) {
+  #frame {
+    width: min(100cqi, calc(100cqb * 9 / 16));
+    font-size: clamp(13px, 2.45cqh, 22px);
+  }
 }
 
 #view {
@@ -169,8 +187,11 @@ footer .btn {
   font: inherit;
   font-weight: 700;
   font-size: 1.05em;
-  height: 2.7em;
-  padding: 0 0.6em 0.12em;
+  height: auto;
+  min-height: 2.7em;
+  padding: 0.35em 0.6em 0.42em;
+  line-height: 1.15;
+  white-space: normal;
   background-color: transparent;
   background-repeat: no-repeat;
   background-position: center;
@@ -226,6 +247,7 @@ footer .btn {
 }
 
 .map-card b { font-size: 1.4em; }
+.map-card span { text-align: center; line-height: 1.15; }
 .map-card.locked { background: #cbb5a4; color: #7a6558; }
 .map-card.current { box-shadow: 0 0 0 0.16em #ff8a3d; animation: pulse 1.2s ease-in-out infinite; }
 .map-card em { font-style: normal; color: #7a6558; font-size: 0.85em; }
@@ -292,10 +314,10 @@ footer .btn {
   gap: 0.4em;
   align-items: center;
 }
-.hud header .btn { pointer-events: auto; width: 4.6em; }
+.hud header .btn { pointer-events: auto; min-width: 4.6em; width: auto; padding-left: 0.45em; padding-right: 0.45em; }
 .titles { text-align: center; color: var(--cream); text-shadow: 0 1px 0 #2a1a14; }
 .titles small, .titles strong { display: block; }
-.titles strong { font-size: 1.2em; }
+.titles strong { font-size: 1.05em; line-height: 1.15; }
 .timer {
   min-width: 4.2em;
   text-align: center;
@@ -351,7 +373,7 @@ footer .btn {
   right: 0.7em;
   bottom: calc(0.7em + env(safe-area-inset-bottom));
 }
-.hud footer .btn { pointer-events: auto; }
+.hud footer .btn { pointer-events: auto; min-height: 44px; overflow: hidden; }
 .coach {
   position: absolute;
   transform: translate(-50%, 0);
@@ -400,9 +422,12 @@ footer .btn {
   padding: 1.2em;
   box-sizing: border-box;
   pointer-events: auto;
+  overflow: auto;
 }
 .card {
   width: min(100%, 22em);
+  max-height: 100%;
+  overflow: auto;
   background: var(--cream);
   color: var(--ink);
   border: 0.2em solid var(--line);
@@ -412,6 +437,15 @@ footer .btn {
   flex-direction: column;
   gap: 0.45em;
   text-align: center;
+}
+
+@container (max-height: 540px) {
+  .hud header { top: calc(0.35em + env(safe-area-inset-top)); }
+  .chips { top: calc(3.5em + env(safe-area-inset-top)); }
+  .hint { top: calc(5.8em + env(safe-area-inset-top)); font-size: 0.82em; }
+  .hud footer { bottom: calc(0.35em + env(safe-area-inset-bottom)); }
+  .screen { padding: 0.65em; gap: 0.4em; }
+  .sign h1 { font-size: 1.6em; }
 }
 .card .line { margin: 0; }
 .card .stars { justify-content: center; }
