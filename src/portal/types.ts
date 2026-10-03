@@ -35,4 +35,9 @@ export interface Portal {
    * for ads this game requested.
    */
   setSuspendHandler(handler: ((suspended: boolean) => void) | null): void
+  /**
+   * BCP 47 language tag from the portal, or null when this build has none.
+   * CrazyGames reads `SDK.user.systemInfo.locale` after init.
+   */
+  localeTag(): string | null
 }

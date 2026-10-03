@@ -344,17 +344,45 @@ export function localeFromTags(tags: readonly string[], query: string | null): L
   return 'en'
 }
 
-function detectLocale(): Locale {
-  const params = new URLSearchParams(globalThis.location?.search ?? '')
-  const query = params.get('lang') ?? params.get('locale')
-  const tags =
-    globalThis.navigator?.languages && globalThis.navigator.languages.length > 0
-      ? globalThis.navigator.languages
-      : [globalThis.navigator?.language || 'en']
-  return localeFromTags(tags, query)
+export type LocaleSource = {
+  portal: 'none' | 'crazygames' | 'gamedistribution'
+  /** Used only when portal is `none`. */
+  navigatorTags: readonly string[]
+  /** CrazyGames `SDK.user.systemInfo.locale`. Ignored for other builds. */
+  sdkLocale: string | null
+  query: string | null
 }
 
-let current: Locale = detectLocale()
+/**
+ * Non-portal builds follow navigator language tags.
+ * Portal builds ignore those tags. CrazyGames uses the SDK locale; any other
+ * portal stays on English unless the QA query overrides it.
+ */
+export function localeForBuild(source: LocaleSource): Locale {
+  if (source.portal === 'none') return localeFromTags(source.navigatorTags, source.query)
+  const tags = source.portal === 'crazygames' && source.sdkLocale ? [source.sdkLocale] : []
+  return localeFromTags(tags, source.query)
+}
+
+function browserTags(): readonly string[] {
+  if (globalThis.navigator?.languages && globalThis.navigator.languages.length > 0) {
+    return globalThis.navigator.languages
+  }
+  return [globalThis.navigator?.language || 'en']
+}
+
+export function refreshLocale(portalId: LocaleSource['portal'], sdkLocale: string | null): void {
+  const params = new URLSearchParams(globalThis.location?.search ?? '')
+  const query = params.get('lang') ?? params.get('locale')
+  current = localeForBuild({
+    portal: portalId,
+    navigatorTags: portalId === 'none' ? browserTags() : [],
+    sdkLocale,
+    query,
+  })
+}
+
+let current: Locale = 'en'
 
 export function getLocale(): Locale {
   return current

@@ -76,6 +76,10 @@ class GameDistributionPortal implements Portal {
     this.suspendHandler = handler
   }
 
+  localeTag() {
+    return null
+  }
+
   private onEvent(event: GdEvent) {
     for (const listener of this.listeners) listener(event)
     if (this.inRequest) return

@@ -8,7 +8,7 @@ import { warmIcons } from './game/icons'
 import { LEVEL_COUNT } from './game/levels'
 import { grantLevelClear, loadSave, saveGame } from './game/save'
 import { Stage } from './game/stage'
-import { applyDocumentLocale, failCopy, levelHint, levelName, t } from './i18n'
+import { applyDocumentLocale, failCopy, levelHint, levelName, refreshLocale, t } from './i18n'
 import { portal } from './portal'
 import { Shell } from './ui/shell'
 
@@ -16,7 +16,11 @@ const frame = document.getElementById('frame')
 if (!frame) throw new Error('missing frame')
 
 for (const tone of ['green', 'yellow', 'blue', 'grey', 'red']) {
-  document.documentElement.style.setProperty(`--btn-${tone}`, `url("${asset(`assets/kenney/ui/btn-${tone}.png`)}")`)
+  // The built stylesheet lives in assets/, so a relative url() is resolved
+  // against that file and requests assets/assets/kenney/... Pin the PNG to
+  // the document URL so Pages and portal zips both load it.
+  const href = new URL(asset(`assets/kenney/ui/btn-${tone}.png`), document.baseURI).href
+  document.documentElement.style.setProperty(`--btn-${tone}`, `url("${href}")`)
 }
 
 const stage = new Stage(frame)
@@ -315,7 +319,19 @@ function axes() {
   return { x, z }
 }
 
+function scrollsThePage(event: KeyboardEvent): boolean {
+  if (event.altKey || event.ctrlKey || event.metaKey) return false
+  return (
+    event.code === 'Space' ||
+    event.code === 'ArrowUp' ||
+    event.code === 'ArrowDown' ||
+    event.code === 'ArrowLeft' ||
+    event.code === 'ArrowRight'
+  )
+}
+
 window.addEventListener('keydown', (event) => {
+  if (scrollsThePage(event)) event.preventDefault()
   held.add(event.key.toLowerCase())
   if (event.key === 'Escape' && screen === 'play' && arena) {
     if (arena.mode === 'play') openPause(false)
@@ -418,6 +434,7 @@ portal.setSuspendHandler((suspended) => {
 
 const boot = async () => {
   await portal.init()
+  refreshLocale(portal.id, portal.localeTag())
   portal.loadingStart()
   warmIcons()
   audio.apply(loadSave().settings)

@@ -17,4 +17,7 @@ export const nonePortal: Portal = {
     return Promise.resolve()
   },
   setSuspendHandler() {},
+  localeTag() {
+    return null
+  },
 }

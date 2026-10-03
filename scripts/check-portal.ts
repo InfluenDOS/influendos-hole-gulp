@@ -4,7 +4,7 @@
  */
 import { watchAd } from '../src/portal/adSession'
 import { planSteps, type StepClock } from '../src/game/fixedStep'
-import { localeFromTags } from '../src/i18n'
+import { localeForBuild, localeFromTags } from '../src/i18n'
 
 function assert(cond: unknown, message: string): asserts cond {
   if (!cond) throw new Error(message)
@@ -16,6 +16,31 @@ assert(localeFromTags(['fr-FR', 'zh-Hans'], null) === 'zh', 'first supported tag
 assert(localeFromTags(['fr-FR'], null) === 'en', 'unknown language defaults to English')
 assert(localeFromTags(['zh-CN'], 'en') === 'en', 'query overrides the browser')
 assert(localeFromTags(['en-US'], 'zh-Hans') === 'zh', 'query can force Chinese')
+
+assert(
+  localeForBuild({ portal: 'crazygames', navigatorTags: ['en-US'], sdkLocale: 'zh-CN', query: null }) === 'zh',
+  'CrazyGames uses the SDK locale',
+)
+assert(
+  localeForBuild({ portal: 'crazygames', navigatorTags: ['zh-CN'], sdkLocale: null, query: null }) === 'en',
+  'CrazyGames falls back to English when the SDK locale is missing',
+)
+assert(
+  localeForBuild({ portal: 'crazygames', navigatorTags: ['zh-CN'], sdkLocale: 'fr-FR', query: null }) === 'en',
+  'CrazyGames ignores navigator.languages and unsupported SDK locales',
+)
+assert(
+  localeForBuild({ portal: 'gamedistribution', navigatorTags: ['zh-CN'], sdkLocale: 'zh-CN', query: null }) === 'en',
+  'other portal builds do not read navigator or a CrazyGames locale',
+)
+assert(
+  localeForBuild({ portal: 'none', navigatorTags: ['zh-Hans', 'en'], sdkLocale: null, query: null }) === 'zh',
+  'non-portal builds still follow navigator.languages',
+)
+assert(
+  localeForBuild({ portal: 'crazygames', navigatorTags: ['en-US'], sdkLocale: 'en-US', query: 'zh' }) === 'zh',
+  'the QA query still overrides the SDK locale',
+)
 
 const blocked = await watchAd({
   start(settle) {

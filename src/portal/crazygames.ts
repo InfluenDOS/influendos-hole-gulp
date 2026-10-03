@@ -9,6 +9,10 @@ type CrazyAdCallbacks = {
 
 type CrazySDK = {
   init: () => Promise<void>
+  user?: {
+    /** Present after init. `locale` is a BCP 47 tag such as `en-US`. */
+    systemInfo?: { locale?: string }
+  }
   game: {
     loadingStart: () => void
     loadingStop: () => void
@@ -110,6 +114,14 @@ class CrazyGamesPortal implements Portal {
   }
 
   setSuspendHandler() {}
+
+  localeTag(): string | null {
+    if (!this.ready) return null
+    const locale = window.CrazyGames?.SDK.user?.systemInfo?.locale
+    if (typeof locale !== 'string') return null
+    const tag = locale.trim()
+    return tag || null
+  }
 
   private request(type: 'midgame' | 'rewarded', hooks?: AdHooks): Promise<boolean> {
     const sdk = this.ready ? window.CrazyGames?.SDK : undefined

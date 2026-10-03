@@ -2,7 +2,7 @@
 
 竖屏超休闲小游戏。透视镜头看着一张立体桌子，按住地面拖动黑洞。比洞口小的东西会翻滚掉进去，洞跟着变大，再去吞清单上的目标。炸弹、辣椒和仙人掌会失败。广告创意可以直接拍实机：洞怎么吃，游戏里就怎么玩。
 
-界面会看浏览器语言：中文用这套文案，其他语言用英文。英文名是 **Table Gulp**（避开 Hole.io）。也可以用 `?lang=zh` 或 `?lang=en` 强制切换。
+GitHub Pages 看浏览器语言；CrazyGames 包用 SDK 的 `systemInfo.locale`，缺省或非中文则用英文。中文用这套文案。英文名是 **Table Gulp**（避开 Hole.io）。`?lang=zh` 或 `?lang=en` 仍可强制切换。
 
 英文项目名：`influendos-hole-gulp`
 

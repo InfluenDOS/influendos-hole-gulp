@@ -1,6 +1,6 @@
 # Portal submission
 
-English title: **Table Gulp**. Chinese title stays **黑洞一口吞** when the browser language is Chinese.
+English title: **Table Gulp**. Chinese title stays **黑洞一口吞** when the selected language is Chinese.
 
 Upload one zip from `dist-portals/`. `npm run build` still writes `dist/` for GitHub Pages and does not call a portal SDK.
 
@@ -20,7 +20,7 @@ New players enter level 1 immediately. There is no title gate and no external li
 | Title | Table Gulp |
 | Short description | Drag a black hole across a 3D table and swallow every snack smaller than the hole. |
 | Description | Table Gulp is a portrait hypercasual game. Hold the table and drag the hole. Snacks smaller than the hole tumble in, and the hole grows. Clear the shopping list before time runs out. Bombs, chili, and cacti end the level. A fast clear with no boosters earns three stars. |
-| Instructions / controls | Drag on the table to move the hole. On a keyboard, use WASD or the arrow keys. Pause from the Pause button. Esc also pauses and is not captured, so the portal can still leave fullscreen. +Time and Magnet spend a free charge, or play an optional rewarded ad when the charges are gone. |
+| Instructions / controls | Drag on the table to move the hole. On a keyboard, use WASD or the arrow keys. Arrow keys and Space are captured so they do not scroll the page. Pause from the Pause button. Esc also pauses and is not captured, so the portal can still leave fullscreen. +Time and Magnet spend a free charge, or play an optional rewarded ad when the charges are gone. |
 | Tags | hypercasual, casual, puzzle, 3d, food, skill, black hole |
 | Category | Hypercasual |
 | Orientation | Portrait. The game letterboxes inside the standard 16:9 iframe. |
@@ -47,4 +47,8 @@ The `none` zip is the same SDK-free package GitHub Pages publishes.
 
 ## Language
 
-The game reads `navigator.languages` and uses Chinese for `zh`, otherwise English. `?lang=en` or `?lang=zh` overrides that, for QA.
+CrazyGames builds read `CrazyGames.SDK.user.systemInfo.locale` after the SDK initializes. Chinese is used when that tag starts with `zh`. A missing locale, or any other language, falls back to English. That build does not read `navigator.languages`.
+
+GitHub Pages and the `none` zip still follow `navigator.languages`, with the same Chinese-or-English rule.
+
+`?lang=en` or `?lang=zh` overrides the detected language on every build, for QA.
