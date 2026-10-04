@@ -10,7 +10,7 @@ GitHub Pages 看浏览器语言；CrazyGames 包用 SDK 的 `systemInfo.locale`�
 
 ## 怎么玩
 
-1. 本地和 GitHub Pages 从标题页点 **开始游戏**。第一次会看到三步说明。门户包（`VITE_PORTAL=crazygames` 或 `gamedistribution`）会直接进入当前关卡，新存档就是第 1 关，说明改由关卡里的拖动提示完成。
+1. 本地和 GitHub Pages 从标题页点 **开始游戏**。第一次会看到三步说明。门户包（`VITE_PORTAL=crazygames`、`gamedistribution` 或 `gamemonetize`）会直接进入当前关卡，新存档就是第 1 关，说明改由关卡里的拖动提示完成。
 2. 按住地面拖动黑洞。桌面端也可以用 WASD 或方向键，`Esc` 暂停。
 3. 只有比洞口小的东西才吞得下。它们会滚到洞心，再翻进洞里。先吃小的，洞会变大。
 4. 桌上还铺着许多小零食。它们会不断掉进洞里，但只让洞长大一点点，大目标仍然要靠关卡里的食物把洞养大。

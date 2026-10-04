@@ -27,7 +27,7 @@ type CrazySDK = {
 declare global {
   interface Window {
     CrazyGames?: { SDK: CrazySDK }
-    __portalSdk?: 'crazygames' | 'gamedistribution' | 'failed'
+    __portalSdk?: 'crazygames' | 'gamedistribution' | 'gamemonetize' | 'failed'
   }
 }
 

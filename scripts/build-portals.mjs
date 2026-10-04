@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url'
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const outRoot = path.join(root, 'dist-portals')
-const portals = ['crazygames', 'gamedistribution', 'none']
+const portals = ['crazygames', 'gamedistribution', 'gamemonetize', 'none']
 
 const tsc = spawnSync('npx', ['tsc', '--noEmit'], { cwd: root, stdio: 'inherit' })
 if (tsc.status !== 0) process.exit(tsc.status ?? 1)
@@ -25,7 +25,7 @@ for (const portal of portals) {
   if (build.status !== 0) process.exit(build.status ?? 1)
   const bundle = readdirSync(path.join(outDir, 'assets')).find((name) => name.endsWith('.js'))
   const source = readFileSync(path.join(outDir, 'assets', bundle), 'utf8')
-  const returns = ['crazygames', 'gamedistribution', 'none'].filter((id) => source.includes(`return"${id}"`))
+  const returns = portals.filter((id) => source.includes(`return"${id}"`))
   if (returns.length !== 1 || returns[0] !== portal) {
     console.error(`Expected bundle to select "${portal}" in ${bundle}, found ${returns.join(', ') || 'nothing'}`)
     process.exit(1)

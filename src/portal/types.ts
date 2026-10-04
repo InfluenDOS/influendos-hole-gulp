@@ -1,12 +1,12 @@
 /**
  * Portal SDK surface used by the game.
  *
- * Build with VITE_PORTAL=crazygames|gamedistribution|none.
- * Playgama, Y8, and GameMonetize can be added as another implementation of
- * this interface without touching gameplay code: they all pause, mute, and
- * resolve rewarded ads the same way.
+ * Build with VITE_PORTAL=crazygames|gamedistribution|gamemonetize|none.
+ * Playgama and Y8 can be added as another implementation of this interface
+ * without touching gameplay code: they all pause, mute, and resolve rewarded
+ * ads the same way.
  */
-export type PortalId = 'crazygames' | 'gamedistribution' | 'none'
+export type PortalId = 'crazygames' | 'gamedistribution' | 'gamemonetize' | 'none'
 
 export type AdHooks = {
   /** Fired only when an ad actually starts. */

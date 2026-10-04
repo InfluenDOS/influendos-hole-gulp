@@ -345,7 +345,7 @@ export function localeFromTags(tags: readonly string[], query: string | null): L
 }
 
 export type LocaleSource = {
-  portal: 'none' | 'crazygames' | 'gamedistribution'
+  portal: 'none' | 'crazygames' | 'gamedistribution' | 'gamemonetize'
   /** Used only when portal is `none`. */
   navigatorTags: readonly string[]
   /** CrazyGames `SDK.user.systemInfo.locale`. Ignored for other builds. */
