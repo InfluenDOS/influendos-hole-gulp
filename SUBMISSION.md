@@ -39,7 +39,23 @@ Enable rewarded ads for that game in the GameDistribution dashboard. The zip set
 
 Use the same title, description, controls, and tags as CrazyGames. Add the game id above before upload. A zip built without `VITE_GD_GAME_ID` still plays; ads will not fill until the id is set.
 
-## Playgama, Y8, GameMonetize
+## GameMonetize
+
+Create the game in the dashboard first (**Game Management > My games > Add game**) and copy its GameId. The title to register is **Table Gulp**. Rebuild with that id, then upload `dist-portals/gamemonetize.zip`:
+
+```bash
+VITE_GM_GAME_ID=your-game-id npm run build:portals
+```
+
+The zip root contains `index.html` plus the game files. On the game page, drop that zip to upload. Click **Verify Game**. When verification passes, click **REQUEST ACTIVATION**.
+
+Payouts are PayPal (USDT ERC20 is also offered) with a **$30** minimum. Below that, the balance carries to the next period. Payment is Net 30: GameMonetize sends it within 25 days of the previous month.
+
+The HTML5 SDK is `https://api.gamemonetize.com/sdk.js` with `window.SDK_OPTIONS = { gameId, onEvent }`. It has one ad call, `sdk.showBanner()`. Midgame (after a cleared level) and rewarded (**+Time**, **Magnet**, **Watch ad to revive**) both use that call. `SDK_GAME_PAUSE` pauses and mutes, including a preroll the SDK starts on its own. `SDK_GAME_START` resumes and unmutes. A reward is granted only when pause is followed by start. A resume without a pause — cooldown, no fill, or ads disabled — grants nothing. `SDK_READY` only means the SDK finished initializing.
+
+Use the same title, description, controls, and tags as CrazyGames. A zip built without `VITE_GM_GAME_ID` still plays; ads and **Verify Game** fail until the id is set.
+
+## Playgama, Y8
 
 Add a class that implements `Portal` in `src/portal/` and list its id in `scripts/build-portals.mjs` and `src/portal/index.ts`. Gameplay only calls that interface: loading, gameplay start/stop, midgame, and rewarded. Pause and mute already happen around those calls.
 
@@ -48,6 +64,8 @@ The `none` zip is the same SDK-free package GitHub Pages publishes.
 ## Language
 
 CrazyGames builds read `CrazyGames.SDK.user.systemInfo.locale` after the SDK initializes. Chinese is used when that tag starts with `zh`. A missing locale, or any other language, falls back to English. That build does not read `navigator.languages`.
+
+GameDistribution and GameMonetize have no locale API. Those builds stay on English unless the QA query overrides them.
 
 GitHub Pages and the `none` zip still follow `navigator.languages`, with the same Chinese-or-English rule.
 

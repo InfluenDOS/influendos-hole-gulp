@@ -1,5 +1,6 @@
 import { crazyGamesPortal } from './crazygames'
 import { gameDistributionPortal } from './gamedistribution'
+import { gameMonetizePortal } from './gamemonetize'
 import { nonePortal } from './none'
 import type { Portal, PortalId } from './types'
 
@@ -9,7 +10,9 @@ declare const __PORTAL_ID__: string
 
 function selectedId(): PortalId {
   const raw = __PORTAL_ID__
-  if (raw === 'crazygames' || raw === 'gamedistribution') return raw
+  if (raw === 'crazygames') return 'crazygames'
+  if (raw === 'gamedistribution') return 'gamedistribution'
+  if (raw === 'gamemonetize') return 'gamemonetize'
   return 'none'
 }
 
@@ -21,4 +24,10 @@ const id = selectedId()
  * only for the matching zip.
  */
 export const portal: Portal =
-  id === 'crazygames' ? crazyGamesPortal : id === 'gamedistribution' ? gameDistributionPortal : nonePortal
+  id === 'crazygames'
+    ? crazyGamesPortal
+    : id === 'gamedistribution'
+      ? gameDistributionPortal
+      : id === 'gamemonetize'
+        ? gameMonetizePortal
+        : nonePortal
